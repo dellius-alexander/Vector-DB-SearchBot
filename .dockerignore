@@ -1,0 +1,9 @@
+docker-compose.yaml
+.dockerignore
+.gitignore
+test_main.http
+
+.vscode
+.github
+graphql-requests.http
+http-client.env.json
