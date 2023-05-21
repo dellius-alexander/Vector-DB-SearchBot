@@ -12,10 +12,11 @@ setup(
     author_email="info@hyfisolutions.com",
     maintainer="info@hyfisolutions.com",
     maintainer_email="info@hyfisolutions.com",
-    description="A FastAPI GraphQL API for Language Translation",
+    description="This application is a question-answering system that uses Milvus, MySQL, Gradio, and HuggingFace "
+                "Sentence Transformers all-mpnet-base-v2 model to help people answer questions.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/dellius-alexander/FastAPI-GraphQL-MongoDB-Demo.git",
+    url="https://github.com/dellius-alexander/Vector-DB-SearchBot.git",
     packages=find_packages(where="."),
     package_dir={"": "."},
     license="LICENSE",

@@ -15,16 +15,17 @@ COPY requirements.txt* /tmp/requirements.txt
 
 # Update pip and Install dependencies
 RUN python3 -m pip install --no-cache-dir --upgrade -r /tmp/requirements.txt pip
-RUN python3 -m nltk.downloader popular
+
 
 # Tell system to use this venv as default
-RUN mkdir -p /entrypoint
+RUN mkdir -p \
+    /entrypoint \
+    /healthcheck
 
 COPY .devcontainer/entrypoint/entrypoint.sh* /entrypoint/entrypoint.sh
-RUN mkdir -p /opt/healthcheck
-COPY .devcontainer/healthcheck/healthcheck.js /opt/healthcheck/healthcheck.js
+COPY .devcontainer/healthcheck/healthcheck.js /healthcheck/healthcheck.js
 HEALTHCHECK --interval=15s --timeout=15s --start-period=30s \
- CMD node /opt/healthcheck/healthcheck.js
+ CMD node /healthcheck/healthcheck.js
 # Start the app
 #ENTRYPOINT ["python3", "-m", "uvicorn", "main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 ENTRYPOINT ["/bin/bash", "/entrypoint/entrypoint.sh"]

@@ -1,12 +1,17 @@
+import logging
 import traceback
 from pymilvus import Collection, FieldSchema, DataType
 import gradio as gr
-from milvus.question_answering import response_handler, generate_and_store_embeddings, format_data, load_data_to_mysql
+from milvus.question_answering import response_handler, generate_and_store_embeddings, \
+    format_data, load_data_to_mysql
 from myLogger.Logger import getLogger as GetLogger
 from milvus.milvus_helper import MilvusClient
 from database.mysql import MySQLDatabase
+from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, \
+    MILVUS_HOST, MILVUS_PORT, MILVUS_USER, MILVUS_PASSWORD, MILVUS_COLLECTION, \
+    MYSQL_DATABASE_TABLE_NAME, APP_HOST, APP_PORT, MILVUS_CONNECTION_ALIAS
 
-log = GetLogger(__name__)
+log = GetLogger(name=__name__, level=logging.DEBUG)
 
 
 def chatbot(collection: Collection, **kwargs):
@@ -49,53 +54,56 @@ def chatbot(collection: Collection, **kwargs):
         msg.submit(fn=response_handler,
                    inputs=[msg, __chatbot],
                    outputs=[msg, __chatbot],
-                   api_name="query_msg", )  # query chatbot
+                   api_name="query", )  # query chatbot
         query_btn.click(fn=response_handler,
                         inputs=[msg, __chatbot],
-                        outputs=[msg, __chatbot],
-                        api_name="query_btn")  # query chatbot
+                        outputs=[msg, __chatbot])  # query chatbot
         clear.click(lambda: None, None, __chatbot, queue=False)  # clear chatbot
     demo.launch(inline=False,
                 debug=True,
                 share=False,
                 show_tips=True,
                 show_api=True,
-                ) # launch the chatbot
+                server_name=APP_HOST,
+                server_port=int(APP_PORT),
+                )  # launch the chatbot
 
 
 if __name__ == '__main__':
     try:
 
-        TABLE_NAME = 'question_answering'
-        mysql_db = MySQLDatabase(host='127.0.0.1',
-                                 port=3306,
-                                 user='milvus',
-                                 password='developer',
-                                 database='milvus_meta')
+        mysql_db = MySQLDatabase(host=MYSQL_HOST,
+                                 port=int(MYSQL_PORT),
+                                 user=MYSQL_USER,
+                                 password=MYSQL_PASSWORD,
+                                 database=MYSQL_DATABASE)
         if not mysql_db:
             raise Exception("Failed to connect to MySQL Server: {}".format(mysql_db))
+
         milvus_client = MilvusClient(**{
-            "alias": 'default',
-            "host": '127.0.0.1',
-            "port": '19530',
-            "user": 'milvus',
-            "password": 'developer'})
+            "alias": MILVUS_CONNECTION_ALIAS,
+            "host": MILVUS_HOST,
+            "port": int(MILVUS_PORT),
+            "user": MILVUS_USER,
+            "password": MILVUS_PASSWORD})
+
         if not milvus_client:
             raise Exception("Failed to connect to Milvus Server: {}".format(milvus_client))
+
         fields = [
             FieldSchema(name="id", dtype=DataType.INT64, descrition="int64", is_primary=True, auto_id=True),
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, descrition="float vector", dim=768,
                         is_primary=False)
         ]
-        collection = milvus_client.create_collection(TABLE_NAME, fields)
-        if collection is None:
-            raise Exception("Failed to create collection: {}".format(TABLE_NAME))
-        log.info("collection: {}".format(collection))
-        ids, question_data, answer_data = generate_and_store_embeddings(collection=collection)
+        __collection = milvus_client.create_collection(MYSQL_DATABASE_TABLE_NAME, fields)
+        if __collection is None:
+            raise Exception("Failed to create collection: {}".format(MYSQL_DATABASE_TABLE_NAME))
+        log.info("collection: {}".format(__collection))
+        ids, question_data, answer_data = generate_and_store_embeddings(collection=__collection)
         load_data_to_mysql(mysql_db.cursor, mysql_db.connection,
-                           TABLE_NAME, format_data(ids, question_data, answer_data))
+                           MYSQL_DATABASE_TABLE_NAME, format_data(ids, question_data, answer_data))
 
-        chatbot(collection=collection)
+        chatbot(collection=__collection)
     except Exception as e:
         log.error("Error: {}".format(e))
         log.error(traceback.format_exc())

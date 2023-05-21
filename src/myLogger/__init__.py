@@ -4,9 +4,9 @@ import logging.config
 import logging
 
 
-LOGGING_CONFIG = "../Resources/logging.json"
+LOGGING_CONFIG = f"{os.getcwd()}/Resources/logging.json"
 print(f"Logging config: {LOGGING_CONFIG}")
-
+print(f"Current Working directory: {os.getcwd()}")
 # check if logging.json has been loaded
 if not logging.root.handlers:
     if not os.path.exists("logs"):

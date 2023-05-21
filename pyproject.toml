@@ -3,13 +3,13 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Language-Translator-API"
+name = "Question-Answering-System"
 version = "0.1.0"
-description = "A FastAPI GraphQL API for Language Translation"
+description = "This application is a question-answering system that uses Milvus, MySQL, Gradio, and HuggingFace Sentence Transformers all-mpnet-base-v2 model to help people answer questions."
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.7"
 scripts = { main_cli = "main:app" }
-keywords = ["FastAPI", "GraphQL", "MongoDB", "Python", "Milvus"]
+keywords = ["FastAPI", "Models", "Vector Database", "Python", "Milvus"]
 authors = [
   { name="Dellius Alexander",  email="info@hyfisolutions.com" },
 ]

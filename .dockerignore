@@ -2,7 +2,9 @@ docker-compose.yaml
 .dockerignore
 .gitignore
 test_main.http
-
+venv
+logs
+gen
 .vscode
 .github
 graphql-requests.http

@@ -6,6 +6,7 @@
 # Connecting to Milvus, BERT and Postgresql
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 import pymysql
+import os
 
 # Connecting to Milvus, BERT and Postgresql
 connections.connect(alias='default',
@@ -85,7 +86,7 @@ from sentence_transformers import SentenceTransformer
 import pandas as pd
 from sklearn.preprocessing import normalize
 
-DATASET_DATA = '../Resources/datasets/questions_answers.csv'
+DATASET_DATA = f'{os.getcwd()}/Resources/datasets/questions_answers.csv'
 model = SentenceTransformer('all-mpnet-base-v2')
 
 # Get questions and answers.

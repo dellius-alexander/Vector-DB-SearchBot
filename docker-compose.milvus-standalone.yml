@@ -148,16 +148,31 @@ services:
     ports:
       - ${APP_PORT:-8000}:${APP_PORT:-8000}
     environment:
-      APP_USER: ${APP_USER:-alpha}
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
+      APP_NAME: ${APP_NAME:-question_answering}
+      APP_HOST: ${APP_HOST:-0.0.0.0}
+      APP_PORT: ${APP_PORT:-8000}
+      APP_SOURCE: ${APP_SOURCE:-${PWD}}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-debug}
+      MILVUS_USER: ${MILVUS_USER:-milvus}
+      MILVUS_PASSWORD: ${MILVUS_PASSWORD:-developer}
+      MILVUS_HOST: ${MILVUS_HOST:-standalone}
+      MILVUS_PORT: ${MILVUS_PORT:-19530}
+      MILVUS_COLLECTION: ${MILVUS_COLLECTION:-question_answering}
+      MILVUS_CONNECTION_ALIAS: ${MILVUS_CONNECTION_ALIAS:-default}
+      ETCD_HOST: ${ETCD_HOST:-etcd}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-developer}
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-milvus_meta}
-      MYSQL_USER: ${MYSQL_USER:-alpha}
-      MYSQL_PASSWORD: ${MYSQL_PASSWD:-developer}
+      MYSQL_DATABASE_TABLE_NAME: ${MYSQL_DATABASE_TABLE_NAME:-question_answering}
     depends_on:
-      mongo:
+      standalone:
         condition: service_healthy
     volumes:
       - ./src:/app
+      - ./src/Resources/models:/root/.cache/torch/
+      - ./.env:/app/.env
     networks:
-        - language
+        - milvus-standalone
+

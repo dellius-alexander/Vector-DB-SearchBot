@@ -1,8 +1,6 @@
 import time
 import traceback
-from typing import List, Any, Dict
-
-import gradio
+from typing import List, Any, Dict, Tuple
 import pymysql
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility, SearchResult
 from sentence_transformers import SentenceTransformer
@@ -10,23 +8,14 @@ import pandas as pd
 from difflib import Differ
 from sklearn.preprocessing import normalize
 from myLogger.Logger import getLogger as GetLogger
-from transformers import pipeline
+from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, \
+    MILVUS_HOST, MILVUS_PORT, MILVUS_USER, MILVUS_PASSWORD, MILVUS_COLLECTION, \
+    MYSQL_DATABASE_TABLE_NAME, MILVUS_CONNECTION_ALIAS, DATASET_PATH, MODEL_SELECTION
 
-# p = pipeline("automatic-speech-recognition")
 log = GetLogger(__name__)
 
-# Connecting to Milvus, BERT and Postgresql
-USERNAME = "milvus"
-PASSWORD = "developer"
-HOST = "127.0.0.1"
-MILVUS_PORT = 19530
-MYSQL_PORT = 3306
-DATASET_DATA = '../Resources/datasets/questions_answers.csv'
-DATABASE_NAME = 'milvus_meta'
-TABLE_NAME = 'question_answering'
-CONNECTION_ALIAS = 'default'
-# Model Selection for Sentence Transformation
-MODEL = SentenceTransformer('all-mpnet-base-v2')
+
+
 
 
 # Setting up milvus and mysql connection
@@ -35,13 +24,21 @@ def connect_to_milvus_and_mysql():
     Connects to Milvus and MySQL
     """
     try:
-        connections.connect(alias=CONNECTION_ALIAS, user=USERNAME, password=PASSWORD, host=HOST, port=MILVUS_PORT)
+        connections.connect(alias=MILVUS_CONNECTION_ALIAS,
+                            user=MILVUS_USER,
+                            password=MILVUS_PASSWORD,
+                            host=MILVUS_HOST,
+                            port=int(MILVUS_PORT))
 
-        conn = pymysql.connect(host=HOST, port=MYSQL_PORT, user=USERNAME, password=PASSWORD, database=DATABASE_NAME,
+        conn = pymysql.connect(host=MYSQL_HOST,
+                               port=int(MYSQL_PORT),
+                               user=MYSQL_USER,
+                               password=MYSQL_PASSWORD,
+                               database=MYSQL_DATABASE,
                                local_infile=True)
         cursor = conn.cursor()
-        log.debug(f'Connection with {CONNECTION_ALIAS} found {connections.has_connection(alias=CONNECTION_ALIAS)}')
-        return conn, cursor, Collection(name=TABLE_NAME)
+        log.debug(f'Connection with {MYSQL_DATABASE} found {connections.has_connection(alias=MILVUS_CONNECTION_ALIAS)}')
+        return conn, cursor, Collection(name=MYSQL_DATABASE_TABLE_NAME)
     except Exception as e:
         log.error(f'Error while connecting to Milvus and MySQL: {e}')
         log.error(traceback.format_exc())
@@ -131,28 +128,28 @@ def store_embeddings(collection, sentence_embeddings) -> List[Any] or None:
         raise e
 
 
-def generate_embeddings(data: Dict):
+def generate_embeddings(data: Dict, model=None) -> Tuple[List[Any], Dict]:
     """
     Generates embeddings for the questions and answers
 
     :param data: data object
+    :param model: sentence transformer model
     :return: sentence_embeddings
     """
-    global MODEL
     try:
-        if MODEL is None:
-            MODEL = SentenceTransformer('all-mpnet-base-v2')
+        if model is None:
+            model = SentenceTransformer('all-mpnet-base-v2')
         # Get questions and answers.
         question_data = data['question'].tolist()
         answer_data = data['answer'].tolist()
         # Generate embeddings
-        sentence_embeddings = MODEL.encode([question_data, answer_data])
+        sentence_embeddings = model.encode([question_data, answer_data])
         log.info(f"Raw embeddings: \n{sentence_embeddings}")
         sentence_embeddings = normalize(sentence_embeddings).tolist()
         log.info(f"Normalized embeddings: \n{sentence_embeddings}")
         return sentence_embeddings, data
     except Exception as e:
-        log.error(f'Error while generating embeddings: \nModel: {MODEL} \n{e}')
+        log.error(f'Error while generating embeddings: \nModel: {model} \n{e}')
         log.error(traceback.format_exc())
         raise e
 
@@ -168,7 +165,7 @@ def generate_and_store_embeddings(collection: Collection):
     """
     global MODEL
     try:
-        data = pd.read_csv(DATASET_DATA)
+        data = pd.read_csv(DATASET_PATH)
         collection = Collection(name=collection.name, schema=collection.schema)
         collection.load()
         log.info(f"Is collection empty: {collection.is_empty}")
@@ -391,19 +388,19 @@ def get_answer(rows) -> str:
 
 
 # API
-def get_response_by_question(question) -> Any:
+def get_response_by_question(question, table_name=MILVUS_COLLECTION) -> Any:
     try:
         # Setting up milvus and mysql connection
         conn, cursor, collection = connect_to_milvus_and_mysql()
         # Creating Collection and Setting Index
-        collection = create_collection(table_name=TABLE_NAME)
+        collection = create_collection(table_name=table_name)
         # Creating Table in MySQL
-        create_table_in_mysql(cursor=cursor, table_name=TABLE_NAME)
+        create_table_in_mysql(cursor=cursor, table_name=table_name)
         # Processing and Storing QA Dataset
         ids, question_data, answer_data = generate_and_store_embeddings(collection=collection)
         # Inserting IDs and Questions-answer Combos into PostgreSQL
         if len(ids) > 0:
-            load_data_to_mysql(cursor, conn, TABLE_NAME, format_data(ids=ids,
+            load_data_to_mysql(cursor, conn, table_name, format_data(ids=ids,
                                                                      question_data=question_data,
                                                                      answer_data=answer_data))
 
@@ -415,27 +412,30 @@ def get_response_by_question(question) -> Any:
         raise e
 
 
-def process_query(cursor, question: str, collection: Collection) -> str:
+def process_query(cursor, question: str, collection: Collection, table_name=MILVUS_COLLECTION,
+                  model=MODEL_SELECTION['sentence_transformers']) -> str:
     """
     Processes the query
 
     :param cursor: cursor object
     :param question: question
+    :param table_name: name of the table
+    :param model: model name
     :param collection: collection object
     """
     log.info("Processing query: {}".format(question))
     # Processing Query
-    query_embeddings = generate_query_embeddings(question, MODEL)
+    query_embeddings = generate_query_embeddings(question, model)
     log.info("Query embeddings generated successfully")
     # Search
     results = search_in_milvus(collection=collection, query_embeddings=query_embeddings)
     log.info("Search results: {}".format(len(results)))
     # Getting the Similar Questions
     ids = [str(x.id) for x in results[0]]
-    similar_questions = get_similar_questions(cursor, ids, TABLE_NAME)
+    similar_questions = get_similar_questions(cursor, ids, table_name)
     log.info("Similar questions: {}".format(similar_questions))
     # Get the answer
-    rows = search_by_similar_questions(cursor, TABLE_NAME, similar_questions, )
+    rows = search_by_similar_questions(cursor, table_name, similar_questions, )
     # Extract answer
     answer = get_answer(rows)
     return answer

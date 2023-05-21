@@ -7,6 +7,7 @@ fastapi
 ffmpeg
 gensim
 gradio
+gradio_client
 graphene
 graphene-mongo
 graphql-core
@@ -27,6 +28,9 @@ setuptools
 scikit-learn
 sentence-transformers
 tokenizers
+torch
+torchvision
+torchaudio
 transformers
 urllib3==1.25.11
 uvicorn
