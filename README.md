@@ -2,11 +2,7 @@
 
 ## Abstract 
 This application is a question-answering system that uses Milvus, MySQL, Gradio, and HuggingFace Sentence 
-Transformers all-mpnet-base-v2 model to help people answer questions. The system retrieves the associated 
-questions and answers from MySQL, generates embeddings for the query and searches for similar embeddings in 
-Milvus vector database. It then returns the answer corresponding to the nearest candidate or best search 
-result found. This is done through the use of chatbot interface for QA system using gradio. The provided 
-reference links can be used to better understand and learn more about the application.
+Transformers all-mpnet-base-v2 model to help people answer questions. 
 
 ## Vector Database Implementation
 
