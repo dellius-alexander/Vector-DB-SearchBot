@@ -136,3 +136,28 @@ services:
         standalone:
             condition: service_healthy
 
+  # Application service
+  app:
+    build:
+      context: .
+      dockerfile: .devcontainer/app.Dockerfile
+    container_name: app
+    restart: always
+    expose:
+      - ${APP_PORT:-8000}
+    ports:
+      - ${APP_PORT:-8000}:${APP_PORT:-8000}
+    environment:
+      APP_USER: ${APP_USER:-alpha}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-milvus_meta}
+      MYSQL_USER: ${MYSQL_USER:-alpha}
+      MYSQL_PASSWORD: ${MYSQL_PASSWD:-developer}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - ./src:/app
+    networks:
+        - language
