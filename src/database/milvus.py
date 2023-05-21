@@ -48,7 +48,7 @@ class ConnectAPI:
                                         **kwargs)
 
             self._state = self
-            log.info(json.dumps(dir(self._client), indent=2))
+            # log.info(json.dumps(dir(self._client), indent=2))
         except Exception as e:
             log.error(e)
 
@@ -81,7 +81,7 @@ class ConnectAPI:
 
 # 2. CollectionAPI:
 class CollectionAPI:
-    _collections: List[Collection] = None  # format: [{"collection_name": [...]}]
+    _collections: List[Collection] = None  # format: ["collection_name", ...]
 
     def __init__(self, **kwargs):
         try:
@@ -153,7 +153,6 @@ class EmbeddingsAPI:
 
     def __init__(self, *args, **kwargs):
         pass
-
 
 
 # 3. VectorAPI:

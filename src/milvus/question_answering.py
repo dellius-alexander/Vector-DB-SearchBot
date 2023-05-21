@@ -1,6 +1,8 @@
 import time
 import traceback
 from typing import List, Any, Dict
+
+import gradio
 import pymysql
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility, SearchResult
 from sentence_transformers import SentenceTransformer
@@ -8,7 +10,9 @@ import pandas as pd
 from difflib import Differ
 from sklearn.preprocessing import normalize
 from myLogger.Logger import getLogger as GetLogger
+from transformers import pipeline
 
+# p = pipeline("automatic-speech-recognition")
 log = GetLogger(__name__)
 
 # Connecting to Milvus, BERT and Postgresql
@@ -170,7 +174,7 @@ def generate_and_store_embeddings(collection: Collection):
         log.info(f"Is collection empty: {collection.is_empty}")
         log.info(f"Number of entities in collection: {collection.num_entities}")
 
-        if collection.num_entities != data.__len__():
+        if collection.is_empty:
             if MODEL is None:
                 MODEL = SentenceTransformer('all-mpnet-base-v2')
                 log.info("Model loaded successfully!")
@@ -216,12 +220,23 @@ def load_data_to_mysql(cursor, conn, table_name, data) -> None:
     :return: None
     """
     sql = "insert into " + table_name + " (id, question, answer) values (%s, %s, %s);"
+    # check to see if the table exists
+    check_table = f"SHOW TABLES LIKE '{table_name}';"
     # check if the data to be inserted is already present
-    check_sql = f"SELECT COUNT(*) FROM {table_name} WHERE id = %s"
+    check_sql = f"SELECT COUNT(*) FROM {table_name} WHERE id = %s;"
     try:
+        if cursor.execute(check_table) == 0:
+            log.info(f"Table {table_name} does not exist!")
+            log.info(f"Creating table {table_name}...")
+            create_table_sql = f"CREATE TABLE {table_name} (id INT NOT NULL, question TEXT NOT NULL, " \
+                               f"answer TEXT NOT NULL, PRIMARY KEY (id));"
+            cursor.execute(create_table_sql)
+            conn.commit()
+            log.info(f"Table {table_name} created successfully!")
         cnt = 0
         for row in data:
-            cursor.execute(check_sql, (row[0],))
+
+            log.info(cursor.execute(check_sql, (row[0],)))
             result = cursor.fetchone()[0]
             if result == 0:
                 cursor.execute(sql, row)
@@ -438,17 +453,50 @@ def diff_texts(text1: str, text2: str):
         for token in d.compare(text1, text2)
     ]
 
+# def diff_texts(text1: str, text2: str):
+#     d = Differ()
+#     diff = d.compare(text1, text2)
+#     output = []
+#
+#     for token in diff:
+#         action = token[0]
+#         word = token[2:]
+#         if action == " ":
+#             output.append((word, None))
+#         else:
+#             output.append((word, action))
+#     return output
+
 
 def handle_diff(text: str):
     result_text = chatbot_handler(text)
     return diff_texts(text, result_text)
 
 
-def response_handler(message, chat_history=None):
-    if chat_history is None:
-        chat_history = []
+def response_handler(message, state: List = None):
     bot_message = chatbot_handler(message)
     # bot_message = diff_texts(message, bot_message)
-    chat_history.append((message, bot_message))
+    state.append((message, bot_message))
     time.sleep(1)
-    return "", chat_history
+    return "", state
+
+
+# def transcribe(__input__, state=None):
+#     chat_history = []
+#     if state is None:
+#         state = ""
+#     if isinstance(__input__, str):
+#         state += str(response_handler(__input__, state))
+#     elif isinstance(__input__, (bytes, bytearray, gradio.Audio)):
+#         text = p(__input__)["text"]
+#         state += str(response_handler(text, state))
+#     log.info("\nState: \n{}".format(state))
+#     return state, state
+
+
+# def transcribe(audio, state=""):
+#     time.sleep(2)
+#     text = p(audio)["text"]
+#     state += text + " "
+#     log.info("\nState: \n{}".format(state))
+#     return state, response_handler(state, [])

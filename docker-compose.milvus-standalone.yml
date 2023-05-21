@@ -7,8 +7,8 @@ networks:
 volumes:
   etcd_data_std: null
   minio_data_std: null
-  milvus_data_std: null
   mysql_data_std: null
+  milvus_data_std: null
 
 services:
   # Etcd service

@@ -26,3 +26,5 @@ src/Resources/datasets/**
 !/src/Resources/models/
 /.run/
 /.github/workflows/
+/src/milvus/flagged/
+/src/milvus/logs/

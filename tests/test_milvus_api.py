@@ -160,11 +160,39 @@ def test_create_embeddings():
     print("\nText vector shape: ")
     print(text_vector.shape)
     # normalize the vector
-    text_vector = text_vector / np.linalg.norm(text_vector)
+    temp_text_vector = np.zeros(text_vector.shape)
+    # vector_sum = sum([abs(a) for a in text_vector.sum(axis=0)])
+    vector_sum = deep_sum(text_vector)
+    print("\nVector sum: ")
+    print(vector_sum)
+    print(sum(abs(text_vector)))
+    if vector_sum < 1:
+        vector_sum = 1
+    for i, vec in enumerate(text_vector):
+        temp_vec = vec / vector_sum
+        print("\nVec: ")
+        print(temp_vec)
+        temp_text_vector[i] = temp_vec
+    text_vector = temp_text_vector
     print("\nNormalize Text vector: ")
     print(text_vector)
     print("\nText vector shape: ")
     print(text_vector.shape)
+
+
+# recursively sum all numbers in a vector
+def deep_sum(vector):
+    vec_sum = 0
+    vector = abs(vector)
+    if isinstance(vector, (list, tuple, np.ndarray)):
+        for i, vec in enumerate(vector):
+            if isinstance(vec, (list, tuple, np.ndarray)):
+                return deep_sum(vec)
+            else:
+                vec_sum += abs(vec)
+    else:
+        vec_sum += abs(vector)
+    return vec_sum
 
 
 def test_encode_word(word="webpack"):

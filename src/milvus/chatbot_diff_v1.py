@@ -1,8 +1,9 @@
-from pymilvus import Collection
+import traceback
+from pymilvus import Collection, FieldSchema, DataType
 import gradio as gr
-
-from milvus.question_answering import connect_to_milvus_and_mysql, create_collection, create_table_in_mysql, \
-    load_data_to_mysql, generate_and_store_embeddings, format_data, handle_diff
+from database.mysql import MySQLDatabase
+from milvus.milvus_helper import MilvusClient
+from milvus.question_answering import load_data_to_mysql, generate_and_store_embeddings, format_data, handle_diff
 from myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
@@ -37,31 +38,59 @@ def chatbot(collection: Collection, **kwargs):
     # # Gradio Interface
     demo = gr.Interface(
         fn=handle_diff,
-        inputs=gr.Textbox(
-            label="Query Search",
-            info="Ask me Question and Press Submit",
-            lines=3,
-
-        ),
-        outputs=gr.HighlightedText(
-            label="Diff",
-            combine_adjacent=True,
-            show_legend=True,
-        ).style(color_map={"+": "red", "-": "green"}),
+        inputs=[
+            gr.Textbox(label="Query Search",
+                       info="Ask me Question and Press Submit",
+                       lines=3),],
+        outputs=[
+            gr.HighlightedText(
+                label="Diff",
+                combine_adjacent=True,
+                show_legend=True,
+            )
+            .style(color_map={"+": "red", "-": "green"}),
+        ],
         theme=gr.themes.Base(),
         description="This is a simple question and answering system that uses a corpus of 1000 questions and answers.",
-        info=gr.Markdown(about)
+        info=gr.Markdown(about),
     )
 
-    demo.launch(share=False)
+    demo.launch(share=False, inline=True, inbrowser=True, debug=True)
 
 
 if __name__ == '__main__':
-    __conn__, __cursor__, collection = connect_to_milvus_and_mysql()
-    __collection__ = create_collection(TABLE_NAME)
-    create_table_in_mysql(__cursor__, TABLE_NAME)
-    ids, question_data, answer_data = generate_and_store_embeddings(collection=__collection__)
-    load_data_to_mysql(__cursor__, __conn__, TABLE_NAME, format_data(ids, question_data, answer_data))
+    try:
 
-    chatbot(collection=__collection__,
-            **{"cursor": __cursor__, "conn": __conn__, "table_name": TABLE_NAME})
+        TABLE_NAME = 'question_answering'
+        mysql_db = MySQLDatabase(host='127.0.0.1',
+                                 port=3306,
+                                 user='milvus',
+                                 password='developer',
+                                 database='milvus_meta')
+        if not mysql_db:
+            raise Exception("Failed to connect to MySQL Server: {}".format(mysql_db))
+        milvus_client = MilvusClient(**{
+            "alias": 'default',
+            "host": '127.0.0.1',
+            "port": '19530',
+            "user": 'milvus',
+            "password": 'developer'})
+        if not milvus_client:
+            raise Exception("Failed to connect to Milvus Server: {}".format(milvus_client))
+        fields = [
+            FieldSchema(name="id", dtype=DataType.INT64, descrition="int64", is_primary=True, auto_id=True),
+            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, descrition="float vector", dim=768,
+                        is_primary=False)
+        ]
+        collection = milvus_client.create_collection(TABLE_NAME, fields)
+        if collection is None:
+            raise Exception("Failed to create collection: {}".format(TABLE_NAME))
+        log.info("collection: {}".format(collection))
+        ids, question_data, answer_data = generate_and_store_embeddings(collection=collection)
+        load_data_to_mysql(mysql_db.cursor, mysql_db.connection,
+                           TABLE_NAME, format_data(ids, question_data, answer_data))
+
+        chatbot(collection=collection)
+    except Exception as e:
+        log.error("Error: {}".format(e))
+        log.error(traceback.format_exc())

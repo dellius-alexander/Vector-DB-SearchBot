@@ -4,6 +4,7 @@ black
 build
 datasets
 fastapi
+ffmpeg
 gensim
 gradio
 graphene
