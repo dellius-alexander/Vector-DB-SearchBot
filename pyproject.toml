@@ -45,8 +45,8 @@ dependencies = [
 
 [project.urls]
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
-"Homepage" = "https://github.com/dellius-alexander/FastAPI-GraphQL-MongoDB-Demo.git"
-"Bug_Tracker" = "https://github.com/dellius-alexander/FastAPI-GraphQL-MongoDB-Demo.git/issues"
+"Homepage" = "https://github.com/dellius-alexander/Vector-DB-SearchBot.git"
+"Bug_Tracker" = "https://github.com/dellius-alexander/Vector-DB-SearchBot.git/issues"
 
 [requires]
 files=["requirements.txt"]

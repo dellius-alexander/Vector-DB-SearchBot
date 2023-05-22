@@ -5,8 +5,7 @@ from sentence_transformers import SentenceTransformer
 
 # Load environment variables
 dotenv.load_dotenv(
-    dotenv_path=os.path.join(os.getcwd(), ".env")
-                or dotenv.find_dotenv(".env", False, False),
+    dotenv_path=os.path.join(os.getcwd(), ".env") or dotenv.find_dotenv(".env", False, False),
     verbose=True,
     encoding="utf-8",
 )
@@ -64,8 +63,12 @@ MILVUS_CALCULATE_DISTANCE_TIMEOUT = 60
 # Dataset Configuration Options
 DATASET_PATH = os.getenv("DATASET_PATH", f'{os.getcwd()}/Resources/datasets/questions_answers.csv')
 DATASET_NAME = os.getenv("DATASET_NAME", "questions_answers")
+MODEL_PATHS = {
+    "sentence_transformers": f"{os.getcwd()}/Resources/models/sentence_transformers/sentence-transformers_all-mpnet-base-v2",
+    "bert-large-uncased-whole-word-masking-finetuned-squad": f"{os.getcwd()}/Resources/models/bert-large-uncased-whole-word-masking-finetuned-squad",
+}
 
 # Models Configuration Options
 MODEL_SELECTION = dict(
-    {"sentence_transformers": SentenceTransformer('all-mpnet-base-v2')}
+    {"sentence_transformers": SentenceTransformer(model_name_or_path=MODEL_PATHS["sentence_transformers"])}
 )
