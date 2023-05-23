@@ -49,3 +49,6 @@ the public repository.
 ![Demo_v1](./api-docs/images/chatbot_v1.png)
 - Figure 2: Simple chatbot demo using Gradio
 
+MAC Address: 24:5E:BE:13:EB:49
+MAC Address: 24:5E:BE:13:EB:4A
+

@@ -1,7 +1,7 @@
 import torch
 from torch.ao import nn
 import numpy as np
-from myLogger.Logger import getLogger as GetLogger
+from src.myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 

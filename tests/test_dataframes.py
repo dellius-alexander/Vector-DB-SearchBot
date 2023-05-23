@@ -1,5 +1,5 @@
 from pandas import DataFrame
-from utils.embedding import merge_df
+from src.utils.embedding import merge_df
 
 
 # Testing merge dataframes

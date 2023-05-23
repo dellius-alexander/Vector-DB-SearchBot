@@ -59,14 +59,14 @@ def chatbot(collection: Collection, **kwargs):
                         inputs=[msg, __chatbot],
                         outputs=[msg, __chatbot])  # query chatbot
         clear.click(lambda: None, None, __chatbot, queue=False)  # clear chatbot
-    demo.launch(inline=False,
-                debug=True,
-                share=False,
-                show_tips=True,
-                show_api=True,
-                server_name=APP_HOST,
-                server_port=int(APP_PORT),
-                )  # launch the chatbot
+        demo.launch(inline=False,
+                    debug=True,
+                    share=False,
+                    show_tips=True,
+                    show_api=True,
+                    server_name=APP_HOST,
+                    server_port=int(APP_PORT),
+                    )  # launch the chatbot
 
 
 if __name__ == '__main__':
@@ -104,6 +104,7 @@ if __name__ == '__main__':
                            MYSQL_DATABASE_TABLE_NAME, format_data(ids, question_data, answer_data))
 
         chatbot(collection=__collection)
+
     except Exception as e:
         log.error("Error: {}".format(e))
         log.error(traceback.format_exc())

@@ -1,4 +1,4 @@
-from myLogger.Logger import getLogger as GetLogger
+from src.myLogger.Logger import getLogger as GetLogger
 log = GetLogger(__name__)
 
 

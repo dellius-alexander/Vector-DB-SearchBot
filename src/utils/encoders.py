@@ -5,7 +5,7 @@ from typing import Union, List, Any
 
 import numpy as np
 
-from myLogger.Logger import getLogger as GetLogger
+from src.myLogger.Logger import getLogger as GetLogger
 import random
 
 log = GetLogger(__name__)

@@ -10,10 +10,10 @@ from nltk.internals import Counter
 from pymilvus import Collection, FieldSchema, DataType, CollectionSchema
 from sklearn.preprocessing import OneHotEncoder
 
-from database.milvus import ConnectAPI, MilvusAPI, CollectionAPI, IndexAPI
-from utils.embedding import TextEmbedding3DVector, clean_text, chunk_the_text
-from utils.decoders import WordDecoder
-from utils.encoders import WordEncoder
+from src.database.milvus import ConnectAPI, MilvusAPI, CollectionAPI, IndexAPI
+from src.utils.embedding import TextEmbedding3DVector, clean_text, chunk_the_text
+from src.utils.decoders import WordDecoder
+from src.utils.encoders import WordEncoder
 
 
 def init_collection(collection_name: str, fields: List[FieldSchema]) -> Collection:

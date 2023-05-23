@@ -1,6 +1,6 @@
 import json
 
-from utils import get_attribute
+from src.utils import get_attribute
 
 
 def test_object_attributes(__object__: object = "Hello World!"):

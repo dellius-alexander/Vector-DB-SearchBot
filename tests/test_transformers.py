@@ -1,5 +1,6 @@
 import csv
 import json
+import os
 import traceback
 
 import pandas as pd
@@ -9,13 +10,13 @@ from pymilvus import connections, FieldSchema, DataType, CollectionSchema, Colle
 from pymilvus.orm import utility
 from transformers import AutoModelWithLMHead, AutoTokenizer, AutoModel, QuestionAnsweringPipeline
 
-from myLogger.Logger import getLogger as GetLogger
+from src.myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 
 MODEL_SELECTION = 'bert-large-uncased-whole-word-masking-finetuned-squad'
 
-DATASET_DATA = '../src/Resources/datasets/questions_answers.csv'
+DATASET_DATA = f'{os.getcwd()}/src/Resources/datasets/questions_answers.csv'
 COLLECTION_NAME = 'question_answer'
 
 # Prepare the Data
