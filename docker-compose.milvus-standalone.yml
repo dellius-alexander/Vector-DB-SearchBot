@@ -38,11 +38,14 @@ services:
     build:
       context: .
       dockerfile: .devcontainer/minio.Dockerfile
+      args:
+        MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+        MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     container_name: milvus-minio
 #    image: minio/minio:RELEASE.2022-03-17T06-34-49Z
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -99,6 +102,7 @@ services:
     container_name: milvus-standalone
     image: milvusdb/milvus:v2.2.8
     command: ["milvus", "run", "standalone"]
+    restart: on-failure
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
@@ -133,6 +137,7 @@ services:
   milvus-gui:
     image: zilliz/attu:latest
     container_name: milvus-gui
+    restart: on-failure
     environment:
       MILVUS_URL: http://standalone:19530
     ports:
@@ -149,7 +154,7 @@ services:
       context: .
       dockerfile: .devcontainer/app.Dockerfile
     container_name: app
-    restart: always
+    restart: on-failure
     expose:
       - ${APP_PORT:-8000}
     ports:
@@ -176,10 +181,11 @@ services:
     depends_on:
       standalone:
         condition: service_healthy
+    working_dir: /app
     volumes:
       - ./src:/app
       - ./src/Resources/models:/root/.cache/torch/
-      - ./.env:/app/.env
+      - ./.env:/app/.env:ro
     networks:
         - milvus-standalone
 

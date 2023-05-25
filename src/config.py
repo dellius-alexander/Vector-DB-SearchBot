@@ -1,8 +1,11 @@
+import json
+
 import dotenv
 import os
-
 from sentence_transformers import SentenceTransformer
+from myLogger.Logger import getLogger as GetLogger
 
+log = GetLogger(__name__)
 # Load environment variables
 dotenv.load_dotenv(
     dotenv_path=os.path.join(os.getcwd(), ".env") or dotenv.find_dotenv(".env", False, False),
@@ -69,6 +72,41 @@ MODEL_PATHS = {
 }
 
 # Models Configuration Options
-MODEL_SELECTION = dict(
-    {"sentence_transformers": SentenceTransformer(model_name_or_path=MODEL_PATHS["sentence_transformers"])}
+MODEL_SELECTION = {"sentence_transformers": SentenceTransformer(model_name_or_path='all-mpnet-base-v2')}
+
+
+# Log all configuration options for debugging purposes
+log.debug(
+    json.dumps({
+        "APP_NAME": APP_NAME,
+        "APP_HOST": APP_HOST,
+        "APP_PORT": APP_PORT,
+        "APP_SOURCE": APP_SOURCE,
+        "APP_LOG_LEVEL": APP_LOG_LEVEL,
+        "MYSQL_HOST": MYSQL_HOST,
+        "MYSQL_PORT": MYSQL_PORT,
+        "MYSQL_USER": MYSQL_USER,
+        "MYSQL_PASSWORD": MYSQL_PASSWORD,
+        "MYSQL_DATABASE": MYSQL_DATABASE,
+        "MYSQL_DATABASE_TABLE_NAME": MYSQL_DATABASE_TABLE_NAME,
+        "MILVUS_USER": MILVUS_USER,
+        "MILVUS_PASSWORD": MILVUS_PASSWORD,
+        "MILVUS_HOST": MILVUS_HOST,
+        "MILVUS_PORT": MILVUS_PORT,
+        "MILVUS_COLLECTION": MILVUS_COLLECTION,
+        "MILVUS_CONNECTION_ALIAS": MILVUS_CONNECTION_ALIAS,
+        "MILVUS_DIMENSION": MILVUS_DIMENSION,
+        "MILVUS_INDEX_FILE_SIZE": MILVUS_INDEX_FILE_SIZE,
+        "MILVUS_METRIC_TYPE": MILVUS_METRIC_TYPE,
+        "MILVUS_INDEX_TYPE": MILVUS_INDEX_TYPE,
+        "MILVUS_NLIST": MILVUS_NLIST,
+        "MILVUS_TOP_K": MILVUS_TOP_K,
+        "MILVUS_SEARCH_PARAM": MILVUS_SEARCH_PARAM,
+        "DATASET_PATH": DATASET_PATH,
+        "DATASET_NAME": DATASET_NAME,
+        "MODEL_PATHS": MODEL_PATHS,
+        # "MODEL_SELECTION": MODEL_SELECTION.get("sentence_transformers"),
+    },
+        indent=4, sort_keys=True
+    )
 )

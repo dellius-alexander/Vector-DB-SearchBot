@@ -13,7 +13,6 @@ from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DAT
 
 log = GetLogger(name=__name__, level=logging.DEBUG)
 
-
 def chatbot(collection: Collection, **kwargs):
     """
     Chatbot interface for the QA system using gradio
@@ -100,8 +99,8 @@ if __name__ == '__main__':
             raise Exception("Failed to create collection: {}".format(MYSQL_DATABASE_TABLE_NAME))
         log.info("collection: {}".format(__collection))
         ids, question_data, answer_data = generate_and_store_embeddings(collection=__collection)
-        load_data_to_mysql(mysql_db.cursor, mysql_db.connection,
-                           MYSQL_DATABASE_TABLE_NAME, format_data(ids, question_data, answer_data))
+        # load_data_to_mysql(mysql_db.cursor, mysql_db.connection,
+        #                    MYSQL_DATABASE_TABLE_NAME, format_data(ids, question_data, answer_data))
 
         chatbot(collection=__collection)
 

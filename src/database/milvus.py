@@ -97,14 +97,20 @@ class CollectionAPI:
                           **kwargs
                           ) -> Collection:
         try:
-            if collection_name in self._collections:
-                raise Exception("Collection already exists.")
+            # check if collection already exists
+            if collection_name in self._client.list_collections():
+                log.info("Collection already exists.")
+                return Collection(name=collection_name)
+            # check if fields is None
+            if fields is None:
+                raise Exception("Fields must be specified when creating a new collection.")
+            # create a new collection since it does not exist
             description = kwargs.get("description", "")
             segment_row_limit = kwargs.get("segment_row_limit", 1000000)
             auto_id = kwargs.get("auto_id", True)
-            if fields is None:
-                raise Exception("Fields must be specified when creating a collection.")
-            schema = CollectionSchema(fields=fields, description=description,
+
+            schema = CollectionSchema(fields=fields,
+                                      description=description,
                                       segment_row_limit=segment_row_limit,
                                       auto_id=auto_id)
             return Collection(name=collection_name,
@@ -149,7 +155,7 @@ class CollectionAPI:
 
 
 # 3.0 EmbeddingsAPI:
-class EmbeddingsAPI:
+class IEmbeddingsAPI:
 
     def __init__(self, *args, **kwargs):
         pass

@@ -15,7 +15,22 @@ from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DAT
 log = GetLogger(__name__)
 
 
+def batch_retrival(arr, batch_amount) -> List:
+    """
+    Retrieves the batch amount from the array until the end of the array is reached
+    
+    :param arr: array
+    :param batch_amount: batch amount to retrieve each loop
+    """
 
+    batch_index = 0  # initial starting index
+    log.info(f'batch_retrival: {len(arr)}')
+    while (batch_index + batch_amount) <= len(arr):  # if index plus batch amount is not greater than array length
+        yield arr[batch_index:batch_index + batch_amount]  # yield portion of array
+        batch_index += (batch_amount - 1)  # add batch amount to index
+    # output rest of array if the length of the array is not a multiple of batch_amount
+    if batch_index < len(arr):
+        yield arr[batch_index:]
 
 
 # Setting up milvus and mysql connection
@@ -155,7 +170,7 @@ def generate_embeddings(data: Dict, model=None) -> Tuple[List[Any], Dict]:
 
 
 # Processing and Storing QA Dataset
-def generate_and_store_embeddings(collection: Collection):
+def generate_and_store_embeddings(collection: Collection, model=MODEL_SELECTION['sentence_transformers']):
     """
     Generates embeddings for the questions and answers and stores them in Milvus
 
@@ -163,7 +178,6 @@ def generate_and_store_embeddings(collection: Collection):
     :param collection: collection object
     :return: ids, question_data, answer_data
     """
-    global MODEL
     try:
         data = pd.read_csv(DATASET_PATH)
         collection = Collection(name=collection.name, schema=collection.schema)
@@ -172,18 +186,17 @@ def generate_and_store_embeddings(collection: Collection):
         log.info(f"Number of entities in collection: {collection.num_entities}")
 
         if collection.is_empty:
-            if MODEL is None:
-                MODEL = SentenceTransformer('all-mpnet-base-v2')
-                log.info("Model loaded successfully!")
+            if not model:
+                raise ValueError("Model object is of None Type.")
             else:
                 log.info("Model already loaded!")
             # Get questions and answers.
             question_data = data['question'].tolist()
             answer_data = data['answer'].tolist()
             # Generate embeddings
-            log.info("Generating raw embeddings...loading......")
-            sentence_embeddings = MODEL.encode(answer_data)
-            log.info("Generating normalized embeddings...loading......")
+            log.info("Generating raw embeddings... Loading......")
+            sentence_embeddings = model.encode(answer_data)
+            log.info("Generating normalized embeddings... Loading......")
             sentence_embeddings = normalize(sentence_embeddings).tolist()
             log.info("Embeddings generated successfully!")
             collection.load()
@@ -200,15 +213,16 @@ def generate_and_store_embeddings(collection: Collection):
             log.info(f"Collection Indexes: {collection.indexes}")
             return [], [], []
     except Exception as e:
-        log.error(f'Error while generating and storing embeddings: \nModel: {MODEL} \nCollection: {collection} \n{e}')
+        log.error(f'Error while generating and storing embeddings: \nModel: {model} \nCollection: {collection} \n{e}')
         log.error(traceback.format_exc())
         raise e
 
 
 # Inserting IDs and Questions-answer Combos into PostgreSQL
-def load_data_to_mysql(cursor, conn, table_name, data) -> None:
+async def load_data_to_mysql(cursor, conn, table_name, data) -> None:
     """
     Loads data into MySQL
+    Inserts the ids, questions and answers into the table
 
     :param cursor: cursor object
     :param conn: connection object
@@ -220,27 +234,32 @@ def load_data_to_mysql(cursor, conn, table_name, data) -> None:
     # check to see if the table exists
     check_table = f"SHOW TABLES LIKE '{table_name}';"
     # check if the data to be inserted is already present
-    check_sql = f"SELECT COUNT(*) FROM {table_name} WHERE id = %s;"
+    # check_sql = f"SELECT COUNT(*) FROM {table_name} WHERE id = %s;"
+    check_count = f"SELECT COUNT(id) FROM {table_name};"
     try:
+        cursor.execute(f"USE {MYSQL_DATABASE};")
         if cursor.execute(check_table) == 0:
             log.info(f"Table {table_name} does not exist!")
             log.info(f"Creating table {table_name}...")
-            create_table_sql = f"CREATE TABLE {table_name} (id INT NOT NULL, question TEXT NOT NULL, " \
+            create_table_sql = f"CREATE TABLE {table_name} (id VARCHAR(128) NOT NULL, question TEXT NOT NULL, " \
                                f"answer TEXT NOT NULL, PRIMARY KEY (id));"
             cursor.execute(create_table_sql)
             conn.commit()
             log.info(f"Table {table_name} created successfully!")
         cnt = 0
-        for row in data:
-
-            log.info(cursor.execute(check_sql, (row[0],)))
-            result = cursor.fetchone()[0]
-            if result == 0:
-                cursor.execute(sql, row)
-                conn.commit()
-                cnt += 1
-                if cnt == 0:
-                    log.info("MYSQL loads data to table: {} successfully".format(table_name))
+        while True:
+            try:
+                row: List = batch_retrival(data, 1000)
+                result = cursor.execute(check_count)
+                # result = cursor.fetchone()[0]
+                if result < len(data) + 1 and len(row) > 0:
+                    cursor.executemany(sql, row)
+                    await conn.commit()
+                    cnt += 1
+                    if cnt == 0:
+                        log.info("MYSQL loads data to table: {} successfully".format(table_name))
+            except StopIteration:
+                break
         log.info("MYSQL loads data to table: {} successfully. Number of Records: {}".format(table_name, cnt))
     except Exception as e:
         log.error(f'Error while loading data to MySQL. Sql insert error: \n{sql}\n{e} ')
@@ -353,7 +372,7 @@ def search_by_similar_questions(cursor, table_name, question=None) -> List:
     :param table_name: name of the table
     :return: answer list
     """
-    sql = "select answer from " + table_name + " where question = `None`;"
+    sql = "select answer from " + table_name + f" where question = `{question}`;"
     try:
         if question is None or len(question) == 0:
             raise Exception("Question is None or empty")
@@ -399,15 +418,14 @@ def get_response_by_question(question, table_name=MILVUS_COLLECTION) -> Any:
         # Processing and Storing QA Dataset
         ids, question_data, answer_data = generate_and_store_embeddings(collection=collection)
         # Inserting IDs and Questions-answer Combos into PostgreSQL
-        if len(ids) > 0:
-            load_data_to_mysql(cursor, conn, table_name, format_data(ids=ids,
-                                                                     question_data=question_data,
-                                                                     answer_data=answer_data))
+        load_data_to_mysql(cursor, conn, table_name, format_data(ids=ids,
+                                                                 question_data=question_data,
+                                                                 answer_data=answer_data))
 
         answer = process_query(cursor, question, collection)
         return answer
     except Exception as e:
-        log.error(f'Error while getting response by question: \nQuestion: {question} \nMODEL: {MODEL} \n{e}')
+        log.error(f'Error while getting response by question: \nQuestion: {question} \n{e}')
         log.error(traceback.format_exc())
         raise e
 
@@ -453,6 +471,7 @@ def diff_texts(text1: str, text2: str):
         for token in d.compare(text1, text2)
     ]
 
+
 # def diff_texts(text1: str, text2: str):
 #     d = Differ()
 #     diff = d.compare(text1, text2)
@@ -479,7 +498,6 @@ def response_handler(message, state: List = None):
     state.append((message, bot_message))
     time.sleep(1)
     return "", state
-
 
 # def transcribe(__input__, state=None):
 #     chat_history = []

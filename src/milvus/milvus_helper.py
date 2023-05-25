@@ -60,13 +60,13 @@ class MilvusClient:
         self.collection = None
 
     def create_collection(self, table_name, fields: List[FieldSchema], **kwargs):
-
         try:
+            collection = None if self.collection is None else self.collection
             field_name = kwargs.get('field_name', 'embedding')
             log.info(f"Has collection {table_name}: {self.client.has_collection(table_name)}")
             if not self.client.has_collection(table_name):
-                self.collection = self.client.create_collection(collection_name=table_name,
-                                                                fields=fields,)
+                collection = self.client.create_collection(collection_name=table_name,
+                                                           fields=fields, )
                 index_params = {
                     "index_type": "IVF_FLAT",
                     "metric_type": "IP",
@@ -75,15 +75,15 @@ class MilvusClient:
 
                 self.client.create_index(
                     field_name=field_name,
-                    collection_name=self.collection.name,
-                    schema=self.collection.schema,
+                    collection_name=collection.name,
+                    schema=collection.schema,
                     index_params=index_params
                 )
                 log.info(f"Collection \"{table_name}\" created successfully!")
             else:
-                self.collection = Collection(name=table_name)
+                collection = Collection(name=table_name)
                 log.info(f"Collection \"{table_name}\" already exists!")
-            return self.collection
+            return collection
         except Exception as e:
             log.error(f"Error while creating collection: {e}")
             log.error(traceback.format_exc())

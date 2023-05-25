@@ -1,4 +1,6 @@
 from pandas import DataFrame
+
+from milvus.question_answering import remove_batch, batch_eliminator
 from src.utils.embedding import merge_df
 
 
@@ -42,3 +44,13 @@ def test_add_columns_to_dataframes_using_merge():
     df0 = merge_df(df1, df2)
     print(f"Shape: {df0.shape}")
     assert df0.shape == (8, 6)
+
+
+def test_batchs_func():
+    array = [x for x in range(10000)]
+    batch_size = 1000
+
+    for batch in batch_eliminator(array, batch_size):
+        print("\n")
+        print(batch)
+

@@ -6,15 +6,21 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
-    git build-essential libsndfile1-dev \
-    tesseract-ocr espeak-ng python3 \
-    python3-pip ffmpeg git-lfs cmake
+    git \
+    build-essential \
+    libsndfile1-dev \
+    tesseract-ocr \
+    espeak-ng python3 \
+    python3-pip \
+    ffmpeg \
+    git-lfs \
+    cmake
 
 # Copy requirements.txt to the image
 COPY requirements.txt* /tmp/requirements.txt
 
 # Update pip and Install dependencies
-RUN python3 -m pip install --no-cache-dir --upgrade -r /tmp/requirements.txt pip
+RUN python -m pip install --no-cache-dir --upgrade -r /tmp/requirements.txt pip
 
 
 # Tell system to use this venv as default
