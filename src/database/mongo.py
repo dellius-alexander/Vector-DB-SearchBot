@@ -2,10 +2,9 @@ import json
 import traceback
 from mongoengine import connect, ConnectionFailure
 import os
-from models.Users import User as UserModel
 
 # Get the logger
-from myLogger.Logger import getLogger as GetLogger
+from ..myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 
@@ -158,9 +157,6 @@ def connect_to_mongo():
     except ConnectionFailure as e:
         log.error("Server not available.")
         log.error(e, exc_info=traceback.format_exc(), stack_info=True)
-
-
-
-    except Exception:
+    except Exception as e:
         log.error("Error initializing the database.")
-        log.error(responses, exc_info=traceback.format_exc(), stack_info=True)
+        log.error(e, exc_info=traceback.format_exc(), stack_info=True)

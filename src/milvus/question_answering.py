@@ -1,14 +1,23 @@
+# %%px --process-after=0
+import asyncio
+import concurrent
+import multiprocessing.pool
+import os
 import time
 import traceback
+# from types import NoneType
 from typing import List, Any, Dict, Tuple
+import numpy as np
 import pymysql
+from pandas import DataFrame
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility, SearchResult
 from sentence_transformers import SentenceTransformer
-import pandas as pd
 from difflib import Differ
 from sklearn.preprocessing import normalize
-from myLogger.Logger import getLogger as GetLogger
-from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, \
+from torch._C import NoneType
+
+from src.myLogger.Logger import getLogger as GetLogger
+from src.config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, \
     MILVUS_HOST, MILVUS_PORT, MILVUS_USER, MILVUS_PASSWORD, MILVUS_COLLECTION, \
     MYSQL_DATABASE_TABLE_NAME, MILVUS_CONNECTION_ALIAS, DATASET_PATH, MODEL_SELECTION
 
@@ -26,11 +35,11 @@ def batch_retrival(arr, batch_amount) -> List:
     batch_index = 0  # initial starting index
     log.info(f'batch_retrival: {len(arr)}')
     while (batch_index + batch_amount) <= len(arr):  # if index plus batch amount is not greater than array length
-        yield arr[batch_index:batch_index + batch_amount]  # yield portion of array
+        yield np.array(arr[batch_index:batch_index + batch_amount])  # yield portion of array
         batch_index += (batch_amount - 1)  # add batch amount to index
     # output rest of array if the length of the array is not a multiple of batch_amount
     if batch_index < len(arr):
-        yield arr[batch_index:]
+        yield np.array(arr[batch_index:])
 
 
 # Setting up milvus and mysql connection
@@ -143,7 +152,7 @@ def store_embeddings(collection, sentence_embeddings) -> List[Any] or None:
         raise e
 
 
-def generate_embeddings(data: Dict, model=None) -> Tuple[List[Any], Dict]:
+def generate_embeddings(data, model=None) -> Tuple[List[Any], Dict]:
     """
     Generates embeddings for the questions and answers
 
@@ -158,60 +167,200 @@ def generate_embeddings(data: Dict, model=None) -> Tuple[List[Any], Dict]:
         question_data = data['question'].tolist()
         answer_data = data['answer'].tolist()
         # Generate embeddings
-        sentence_embeddings = model.encode([question_data, answer_data])
+        sentence_embeddings = model.encode([data])
         log.info(f"Raw embeddings: \n{sentence_embeddings}")
+
         sentence_embeddings = normalize(sentence_embeddings).tolist()
         log.info(f"Normalized embeddings: \n{sentence_embeddings}")
-        return sentence_embeddings, data
+        return sentence_embeddings
     except Exception as e:
         log.error(f'Error while generating embeddings: \nModel: {model} \n{e}')
         log.error(traceback.format_exc())
         raise e
 
 
+def least_common_divisor(num):
+    for i in range(1, num + 1):
+        if num % i == 0:
+            for divisor in range(2, i + 1):
+                if (i % divisor == 0) and (num % divisor == 0):
+                    return divisor
+
+
+def array_split(data, batch_size) -> np.ndarray:
+    """
+    Splits the data into batches
+
+    :param data: data object
+    :param batch_size: size of the batch
+    :return: batches of the data
+    """
+    arr = []
+    end = batch_size
+    dataset_size = len(data)
+    log.debug(f"Dataset size: {dataset_size}")
+    for start in range(0, dataset_size, batch_size):
+        log.debug(f"\nStart: {start} End: {end}")
+        if end <= dataset_size:
+            chunk = np.array(data[start:end].tolist(), dtype=object)
+            size_of_batch = (end - start)
+            log.debug(f"\nBatch Size: {size_of_batch} \nChunk: \n{chunk}")
+            # arr.append(chunk)
+            # log.debug(f"\nStart: {start} End: {end}")
+            end += size_of_batch
+            arr.append(chunk)
+            log.debug(f"\nShape: {chunk.shape}"
+                      f"\nChunk: \n{chunk.size}")
+    arr = np.array(arr, dtype=object)
+    log.debug(f"\nBatches Shape: {arr.shape}, \nBatches: \n{arr}")
+    return arr
+
+
+async def model_encoder(data: np.array = None, model=None) -> np.array:
+    try:
+        # log.debug(f"\nDataset: \n{data}")
+        if f"{data}" == "None":
+            return None
+        else:
+            encoded_dataset = normalize(model.encode(data))
+        # log.debug(f"\nEncoded dataset: \n{encoded_dataset}")
+        return encoded_dataset
+    except Exception as e:
+        log.error(f'\nError while encoding the dataset: {e}')
+        log.error(traceback.format_exc())
+        return None
+
+
+async def async_model_encoder(data: np.array, model) -> np.array:
+    return await model_encoder(data, model)
+
+
+async def async_generate_embeddings(data: np.array, model) -> np.array:
+    tasks = []
+    try:
+        # log.debug(f"\nDataset: {data}")
+        start = time.perf_counter()
+        dataset_size = len(data)
+        lcd = least_common_divisor(dataset_size) \
+            if least_common_divisor(dataset_size) != dataset_size \
+            else least_common_divisor(dataset_size - 1)
+        # negate the first digit, if Integer has one digit to produce exponent equal 0.
+        exponent = len(str(dataset_size)) - 1
+        divisor = lcd ** exponent
+        batch_size = dataset_size // divisor
+        remainder = dataset_size % divisor
+        batched_data_chunks = array_split(np.array(data, dtype=object), batch_size)
+        batched_data_chunks_size = len(batched_data_chunks)
+        log.info(f"\nDataset size: {dataset_size}"
+                 f"\nBatch size: {batch_size}"
+                 f"\nBatches: {batched_data_chunks_size}"
+                 f"\nLeast common divisor: {lcd}"
+                 f"\nExponent: {exponent}"
+                 f"\nDivisors: {divisor}")
+        # create tasks for each batch of data to be encoded and store them in a list
+        for i in range(0, batched_data_chunks_size):
+            batch = np.array(batched_data_chunks[i], dtype=object)
+            if batch.size == 0:
+                continue
+            # log.debug(f"Batch: \n{batch}")
+            task = asyncio.create_task(async_model_encoder(batch, model))
+            tasks.append(task)
+            # run the tasks concurrently and store the embeddings in a list
+            # for task in tasks:
+        log.debug("\nGenerating embeddings ...")
+        sentence_embeddings = []
+        for task in tasks:
+            resp = await asyncio.gather(task)
+            if resp[0] is None:
+                continue
+            sentence_embeddings.extend(resp[0].tolist())
+        # sentence_embeddings = await asyncio.gather(*tasks)
+        sentence_embeddings = np.array(sentence_embeddings, dtype=object)
+        stop = time.perf_counter()
+        embeddings_count = sentence_embeddings.size
+        log.debug(f"\nTime taken to generate embeddings: {stop - start:.5f} seconds"
+                  f"\nNumber of entities in dataset: {dataset_size}"
+                  f"\nTotal Embeddings: {embeddings_count}, Shape: {sentence_embeddings.shape}"
+                  f"\nEmbeddings Generated per Milliseconds: {(embeddings_count / (stop - start)):.5f} ms")
+        return sentence_embeddings
+    except Exception as e:
+        log.error(f'Error while generating embeddings: \nModel: {model} \n{e}')
+        # log.error(data)
+        log.error(traceback.format_exc())
+
+
+def encode_data(data: np.array, model) -> List[Any]:
+    return asyncio.run(async_generate_embeddings(data, model))
+
+
 # Processing and Storing QA Dataset
-def generate_and_store_embeddings(collection: Collection, model=MODEL_SELECTION['sentence_transformers']):
+def generate_and_store_embeddings(collection: Collection,
+                                  data: DataFrame, model) -> Tuple[List[Any], List[Any], List[Any]]:
     """
     Generates embeddings for the questions and answers and stores them in Milvus
 
-    :param model: BERT model
     :param collection: collection object
-    :return: ids, question_data, answer_data
+    :param data: QA dataset
+    :param model: model object
+    :return: ([ids], [question_data], [answer_data])
     """
     try:
-        data = pd.read_csv(DATASET_PATH)
-        collection = Collection(name=collection.name, schema=collection.schema)
-        collection.load()
-        log.info(f"Is collection empty: {collection.is_empty}")
-        log.info(f"Number of entities in collection: {collection.num_entities}")
 
-        if collection.is_empty:
+        # collection = Collection(name=collection.name, schema=collection.schema)
+        collection.load()
+        num_entities = collection.num_entities
+        log.info(f"Is collection empty: {collection.is_empty}")
+        log.info(f"Number of entities in collection: {num_entities}")
+        # Get questions and answers.
+        question_data = np.array(data['question'].tolist(), dtype=object)
+        answer_data = np.array(data['answer'].tolist(), dtype=object)
+        dataset_size = len(question_data)
+        log.debug(f"\nDataset entity count: {dataset_size}")
+        # Check if collection is empty
+        if num_entities < dataset_size:
             if not model:
                 raise ValueError("Model object is of None Type.")
             else:
                 log.info("Model already loaded!")
-            # Get questions and answers.
-            question_data = data['question'].tolist()
-            answer_data = data['answer'].tolist()
+
             # Generate embeddings
             log.info("Generating raw embeddings... Loading......")
-            sentence_embeddings = model.encode(answer_data)
-            log.info("Generating normalized embeddings... Loading......")
-            sentence_embeddings = normalize(sentence_embeddings).tolist()
+            answer_embeddings = encode_data(question_data, model)
+            # log.info("Generating normalized embeddings... Loading......")
+            # sentence_embeddings = normalize(sentence_embeddings).tolist()
             log.info("Embeddings generated successfully!")
+            # Load the collection and Store embeddings in Milvus
             collection.load()
-            log.info(f"Number of entities in collection: {collection.num_entities}")
-            log.info(f"Number of embeddings: {len(sentence_embeddings)}")
-            # raise Exception("Number of entities in collection and embeddings do not match!")
-            mr = collection.insert([sentence_embeddings])
+            # Insert embeddings into the collection
+            mr = collection.insert([answer_embeddings])
+            log.info(f"Insertion count: {mr.insert_count}")
+            num_entities = collection.num_entities
+            log.info(f"Number of entities in collection: {num_entities}")
             ids = mr.primary_keys
-            log.info("Embeddings generated and stored successfully!")
+            if len(ids) != len(answer_embeddings):
+                raise Exception("Number of ids and embeddings do not match!"
+                                f"Number of ids: {len(ids)} \nNumber of embeddings: {len(answer_embeddings)}"
+                                f"Something went wrong while inserting embeddings into the collection!")
+            log.info("Embeddings generated and stored successfully!"
+                     f"Number of entities in collection: {collection.num_entities}")
             return ids, question_data, answer_data
         else:
-            log.info("Embeddings already generated and stored!")
-            log.info(f"Number of entities in collection: {collection.num_entities}")
-            log.info(f"Collection Indexes: {collection.indexes}")
-            return [], [], []
+            log.info("\nEmbeddings already generated and stored!"
+                     f"\nNumber of entities in collection: {collection.num_entities}"
+                     f"\nCollection data: \n{collection.indexes.pop().to_dict()} ")
+            # Get the ids of the entities in the collection
+            ids = DataFrame(collection.query("id > 0", output_fields=["id"], limit=dataset_size)).values.tolist()
+            ids = [id[0] for id in ids]
+            # log.debug(f"IDs: \n{ids}")
+            # Throw exception if the number of ids is less than the number of entities in the dataset
+            if len(ids) < dataset_size:
+                log.error(f"Number of ids: {len(ids)}")
+                # log.error(f"IDs: \n{ids}")
+                raise Exception("Number of ids in collection is less than the number of entities in the dataset!")
+
+            log.info(f"Number of ids: {len(ids)}")
+            # log.info(f"IDs: \n{ids}")
+            return ids, question_data, answer_data
     except Exception as e:
         log.error(f'Error while generating and storing embeddings: \nModel: {model} \nCollection: {collection} \n{e}')
         log.error(traceback.format_exc())
@@ -219,7 +368,7 @@ def generate_and_store_embeddings(collection: Collection, model=MODEL_SELECTION[
 
 
 # Inserting IDs and Questions-answer Combos into PostgreSQL
-async def load_data_to_mysql(cursor, conn, table_name, data) -> None:
+def load_data_to_mysql(cursor: pymysql.Connection.cursor, conn: pymysql.Connection, table_name, data) -> None:
     """
     Loads data into MySQL
     Inserts the ids, questions and answers into the table
@@ -230,41 +379,60 @@ async def load_data_to_mysql(cursor, conn, table_name, data) -> None:
     :param data: data to be loaded
     :return: None
     """
-    sql = "insert into " + table_name + " (id, question, answer) values (%s, %s, %s);"
+    insert_statement = f"INSERT INTO {table_name} (id, question, answer) VALUES (%s, %s, %s) ;"
+    log.debug(f"Insert statement: {insert_statement}")
     # check to see if the table exists
-    check_table = f"SHOW TABLES LIKE '{table_name}';"
+    check_table = f"SHOW TABLES LIKE {table_name};"
     # check if the data to be inserted is already present
     # check_sql = f"SELECT COUNT(*) FROM {table_name} WHERE id = %s;"
-    check_count = f"SELECT COUNT(id) FROM {table_name};"
+    check_count = f"SELECT COUNT(id) FROM {MYSQL_DATABASE}.{table_name} LIMIT 1;"
+    create_table_sql = f"CREATE TABLE {MYSQL_DATABASE}.{table_name} " \
+                       f"(idx MEDIUMINT NOT NULL AUTO_INCREMENT, " \
+                       f"id VARCHAR(128) NOT NULL, " \
+                       f"question TEXT NOT NULL, answer TEXT NOT NULL, PRIMARY KEY (idX))" \
+                       f" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
     try:
         cursor.execute(f"USE {MYSQL_DATABASE};")
-        if cursor.execute(check_table) == 0:
-            log.info(f"Table {table_name} does not exist!")
-            log.info(f"Creating table {table_name}...")
-            create_table_sql = f"CREATE TABLE {table_name} (id VARCHAR(128) NOT NULL, question TEXT NOT NULL, " \
-                               f"answer TEXT NOT NULL, PRIMARY KEY (id));"
-            cursor.execute(create_table_sql)
-            conn.commit()
-            log.info(f"Table {table_name} created successfully!")
-        cnt = 0
-        while True:
-            try:
-                row: List = batch_retrival(data, 1000)
-                result = cursor.execute(check_count)
-                # result = cursor.fetchone()[0]
-                if result < len(data) + 1 and len(row) > 0:
-                    cursor.executemany(sql, row)
-                    await conn.commit()
-                    cnt += 1
-                    if cnt == 0:
-                        log.info("MYSQL loads data to table: {} successfully".format(table_name))
-            except StopIteration:
-                break
-        log.info("MYSQL loads data to table: {} successfully. Number of Records: {}".format(table_name, cnt))
+        log.debug(f"Using database: {MYSQL_DATABASE}")
+        results = cursor.execute(check_count)
+        log.debug(f"Database exists: {results}")
+        exit(0)
+        # if cursor.execute(check_table) == 0:
+        #
+        #     log.info(f"Table {table_name} does not exist!")
+        #     log.info(f"Creating table {table_name}...")
+        #
+        #     cursor.execute(create_table_sql)
+        #     conn.commit()
+        #     log.info(f"Table {table_name} created successfully!")
+        #
+        # cnt = 0
+        # while True:
+        #     try:
+        #         rows: List = batch_retrival(data, 1000).__next__().tolist()
+        #         result = cursor.execute(check_count)
+        #         log.debug(f"Number of records in table: {result}")
+        #         log.debug(f"Number of records in data: \n{rows}")
+        #         # result = cursor.fetchone()[0]
+        #         if result < len(data) + 1:
+        #             # for row in rows:
+        #             #     cursor.execute(insert_statement, row)
+        #             cursor.executemany(query=insert_statement, args=rows)
+        #             # log.debug(f"Number of records inserted: {var}")
+        #             conn.commit()
+        #             cnt += 1
+        #             if cnt == 0:
+        #                 log.info("MYSQL loads data to table: {} successfully".format(table_name))
+        #             result = cursor.execute(check_count)
+        #         else:
+        #             log.info("MYSQL loads data to table: {} successfully".format(table_name))
+        #             break
+        #     except StopIteration:
+        #         break
+        # log.info("MYSQL loads data to table: {} successfully. Number of Records: {}".format(table_name, cnt))
     except Exception as e:
-        log.error(f'Error while loading data to MySQL. Sql insert error: \n{sql}\n{e} ')
+        log.error(f'\nError while loading data to MySQL: \n{str(e.args[1]).__contains__("")} ')
         log.error(traceback.format_exc())
-        raise e
 
 
 # Combine the id of the vector and the question data into a list
@@ -280,9 +448,12 @@ def format_data(ids, question_data, answer_data) -> List:
     try:
         data = []
         for i in range(len(ids)):
-            value = (str(ids[i]), question_data[i], answer_data[i])
+            value = (f"{ids[i]}", f"{question_data[i]}", f"{answer_data[i]}")
+            # log.debug(f"Value: \n{value}")
             data.append(value)
+        # data = np.array(data, dtype=object)
         log.info("Data formatted successfully")
+        log.debug(f"Formatted data count: {len(data)}")
         return data
     except Exception as e:
         log.error(f'Error while formatting data: {e}')
@@ -417,10 +588,13 @@ def get_response_by_question(question, table_name=MILVUS_COLLECTION) -> Any:
         create_table_in_mysql(cursor=cursor, table_name=table_name)
         # Processing and Storing QA Dataset
         ids, question_data, answer_data = generate_and_store_embeddings(collection=collection)
+        # Format the data
+        data = format_data(ids=ids,
+                           question_data=question_data,
+                           answer_data=answer_data)
         # Inserting IDs and Questions-answer Combos into PostgreSQL
-        load_data_to_mysql(cursor, conn, table_name, format_data(ids=ids,
-                                                                 question_data=question_data,
-                                                                 answer_data=answer_data))
+
+        load_data_to_mysql(cursor, conn, table_name, data)
 
         answer = process_query(cursor, question, collection)
         return answer
@@ -441,22 +615,26 @@ def process_query(cursor, question: str, collection: Collection, table_name=MILV
     :param model: model name
     :param collection: collection object
     """
-    log.info("Processing query: {}".format(question))
-    # Processing Query
-    query_embeddings = generate_query_embeddings(question, model)
-    log.info("Query embeddings generated successfully")
-    # Search
-    results = search_in_milvus(collection=collection, query_embeddings=query_embeddings)
-    log.info("Search results: {}".format(len(results)))
-    # Getting the Similar Questions
-    ids = [str(x.id) for x in results[0]]
-    similar_questions = get_similar_questions(cursor, ids, table_name)
-    log.info("Similar questions: {}".format(similar_questions))
-    # Get the answer
-    rows = search_by_similar_questions(cursor, table_name, similar_questions, )
-    # Extract answer
-    answer = get_answer(rows)
-    return answer
+    try:
+        log.info("Processing query: {}".format(question))
+        # Processing Query
+        query_embeddings = generate_query_embeddings(question, model)
+        log.info("Query embeddings generated successfully")
+        # Search
+        results = search_in_milvus(collection=collection, query_embeddings=query_embeddings)
+        log.info("Search results: {}".format(len(results)))
+        # Getting the Similar Questions
+        ids = [str(x.id) for x in results[0]]
+        similar_questions = get_similar_questions(cursor, ids, table_name)
+        log.info("Similar questions: {}".format(similar_questions))
+        # Get the answer
+        rows = search_by_similar_questions(cursor, table_name, similar_questions, )
+        # Extract answer
+        answer = get_answer(rows)
+        return answer
+    except Exception as e:
+        log.error(f'Error while processing query: \nQuestion: {question} \n{e}')
+        log.error(traceback.format_exc())
 
 
 def chatbot_handler(question) -> str:

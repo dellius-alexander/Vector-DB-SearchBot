@@ -1,17 +1,21 @@
 import logging
 import traceback
+
+import numpy as np
+import pandas as pd
 from pymilvus import Collection, FieldSchema, DataType
 import gradio as gr
-from milvus.question_answering import response_handler, generate_and_store_embeddings, \
-    format_data, load_data_to_mysql
-from myLogger.Logger import getLogger as GetLogger
-from milvus.milvus_helper import MilvusClient
-from database.mysql import MySQLDatabase
-from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, \
+from src.milvus.question_answering import response_handler, generate_and_store_embeddings, \
+    format_data, load_data_to_mysql, encode_data
+from src.myLogger.Logger import getLogger as GetLogger
+from src.milvus.milvus_helper import MilvusClient
+from src.database.mysql import MySQLDatabase
+from src.config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, \
     MILVUS_HOST, MILVUS_PORT, MILVUS_USER, MILVUS_PASSWORD, MILVUS_COLLECTION, \
-    MYSQL_DATABASE_TABLE_NAME, APP_HOST, APP_PORT, MILVUS_CONNECTION_ALIAS
+    MYSQL_DATABASE_TABLE_NAME, APP_HOST, APP_PORT, MILVUS_CONNECTION_ALIAS, DATASET_PATH, MODEL_SELECTION
 
 log = GetLogger(name=__name__, level=logging.DEBUG)
+
 
 def chatbot(collection: Collection, **kwargs):
     """
@@ -68,7 +72,7 @@ def chatbot(collection: Collection, **kwargs):
                     )  # launch the chatbot
 
 
-if __name__ == '__main__':
+def main():
     try:
 
         mysql_db = MySQLDatabase(host=MYSQL_HOST,
@@ -78,6 +82,7 @@ if __name__ == '__main__':
                                  database=MYSQL_DATABASE)
         if not mysql_db:
             raise Exception("Failed to connect to MySQL Server: {}".format(mysql_db))
+        log.debug(f"MySQL Database: \n{mysql_db}")
 
         milvus_client = MilvusClient(**{
             "alias": MILVUS_CONNECTION_ALIAS,
@@ -97,12 +102,32 @@ if __name__ == '__main__':
         __collection = milvus_client.create_collection(MYSQL_DATABASE_TABLE_NAME, fields)
         if __collection is None:
             raise Exception("Failed to create collection: {}".format(MYSQL_DATABASE_TABLE_NAME))
-        log.info("collection: {}".format(__collection))
-        ids, question_data, answer_data = generate_and_store_embeddings(collection=__collection)
-        # load_data_to_mysql(mysql_db.cursor, mysql_db.connection,
-        #                    MYSQL_DATABASE_TABLE_NAME, format_data(ids, question_data, answer_data))
+        log.info("collection: \n{}".format(__collection))
 
-        chatbot(collection=__collection)
+        ids, question_data1, answer_data1 = generate_and_store_embeddings(collection=__collection,
+                                                                        data=data,
+                                                                        model=model)
+        formatted_data = format_data(ids, question_data, answer_data)
+        load_data_to_mysql(mysql_db.cursor,
+                           mysql_db.connection,
+                           MYSQL_DATABASE_TABLE_NAME,
+                           formatted_data)
+        # chatbot(collection=__collection)
+    except Exception as e:
+        log.error(e)
+        log.error(traceback.format_exc())
+
+
+if __name__ == '__main__':
+    try:
+        model = MODEL_SELECTION['sentence_transformers']
+        data = pd.read_csv(DATASET_PATH)
+        answer_data = data['answer'].values
+        question_data = data['question'].values
+        # random_dataset = np.random.choice(data['question'].values, 99)
+        # embeddings = encode_data(data=random_dataset, model=model)
+        # log.info(f"Embeddings shape: {embeddings.shape}")
+        main()
 
     except Exception as e:
         log.error("Error: {}".format(e))

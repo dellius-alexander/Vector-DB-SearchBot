@@ -54,12 +54,13 @@ class WordDecoder(IWordDecoder):
             # Return the decoded word
             return self.decoded_word
         except Exception as e:
-            log.error(e)
+            log.error(f"Error decoding floats: {e}")
+            log.error(f"Floats: {floats}")
             return None
 
     def __dict__(self):
         return [{"WordDecoder": {
-            "floats": self.floats,
+            "encodings": self.floats,
             "decoded_word": self.decoded_word
         }}]
 

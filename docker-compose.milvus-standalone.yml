@@ -5,73 +5,209 @@ networks:
     driver: bridge
 
 volumes:
-  etcd_data_std: null
+  etcd_data_00: null
+  etcd_data_01: null
+  etcd_data_02: null
   minio_data_std: null
   mysql_data_std: null
   milvus_data_std: null
 
 services:
-  # Etcd service
-  etcd:
-    container_name: milvus-etcd
-    image: quay.io/coreos/etcd:v3.5.5
-    environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-      - ETCD_SNAPSHOT_COUNT=50000
-      - ENDPOINTS=http://127.0.0.1:2379,http://0.0.0.0:2379
+  proxy.example.com:
+    # NGINX proxy service and load balancer
+    # [Note: All containers that are behind the  proxy service must start first,
+    # then the proxy service can startup successfully. Once running it will maintain
+    # a health check for each support service. See logs for details.]
+    # image: nginx:alpine
+    build:
+      context: .
+      dockerfile: .devcontainer/nginx.Dockerfile
+      args:
+        VERSION: alpine
+        HOSTNAME: proxy.example.com
+    container_name: milvus-proxy
+    hostname: proxy.example.com
     volumes:
-      - etcd_data_std:/etcd
+      - .devcontainer/config/nginx/html/index.php:/usr/share/nginx/html/index.php:ro
+      - .devcontainer/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - .devcontainer/config/nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - milvus-standalone
+    ports:
+      - 2379:2379
+      - 2380:2380
+      - 8087:8087
+      - 8080:80
+      - 9000:9000
+      - 9001:9001
+      - 3306:3306
+      - 33060:33060
+      - 33061:33061
+    depends_on:
+      etcd-00:
+        condition: service_started
+      etcd-01:
+        condition: service_started
+      etcd-02:
+        condition: service_started
+      mysql:
+        condition: service_started
+      minio:
+        condition: service_healthy
+#      milvus.example.com:
+#        condition: service_started
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://proxy.example.com"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: on-failure
+
+  # Etcd services
+  etcd-00:
+    # image: quay.io/coreos/etcd:v3.5.5
+    build:
+      context: .
+      dockerfile: .devcontainer/etcd.Dockerfile
+      args:
+        VERSION: v3.5.5
+    container_name: milvus-etcd-00
+    shm_size: 2g
+    hostname: etcd-00
+    env_file:
+      - .devcontainer/config/etcd/etcd.env
+    environment:
+      - ETCD_NAME=etcd-00
+    volumes:
+      - etcd_data_00:/etcd
+      - .devcontainer/certs/data/etcd:/etc/ssl/certs/etcd
     networks:
         - milvus-standalone
-    command: etcd --data-dir='/etcd' --name milvus_etcd0 --initial-advertise-peer-urls 'http://127.0.0.1:2380' --listen-peer-urls 'http://0.0.0.0:2380' --advertise-client-urls 'http://127.0.0.1:2379' --listen-client-urls 'http://0.0.0.0:2379' --initial-cluster milvus_etcd0='http://127.0.0.1:2380'
     healthcheck:
-      test: [ "CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health" ]
+      test: [ "CMD", "etcdctl", "--endpoints=http://etcd-00:2379", "endpoint", "health" ]
       interval: 30s
       timeout: 20s
       retries: 5
       start_period: 30s
-  # Minio service
-  # https://min.io/docs/minio/linux/reference/minio-server/minio-server.html
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: on-failure
+
+  etcd-01:
+    # image: quay.io/coreos/etcd:v3.5.5
+    build:
+      context: .
+      dockerfile: .devcontainer/etcd.Dockerfile
+      args:
+        VERSION: v3.5.5
+    container_name: milvus-etcd-01
+    shm_size: 2g
+    hostname: etcd-01
+    env_file:
+      - .devcontainer/config/etcd/etcd.env
+    environment:
+      - ETCD_NAME=etcd-01
+    volumes:
+      - etcd_data_01:/etcd
+      - .devcontainer/certs/data/etcd:/etc/ssl/certs/etcd
+    networks:
+        - milvus-standalone
+    healthcheck:
+      test: [ "CMD", "etcdctl", "--endpoints=http://etcd-01:2379", "endpoint", "health" ]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: on-failure
+
+  etcd-02:
+    # image: quay.io/coreos/etcd:v3.5.5
+    build:
+      context: .
+      dockerfile: .devcontainer/etcd.Dockerfile
+      args:
+        VERSION: v3.5.5
+    container_name: milvus-etcd-02
+    shm_size: 2g
+    hostname: etcd-02
+    env_file:
+      - .devcontainer/config/etcd/etcd.env
+    environment:
+      - ETCD_NAME=etcd-02
+    volumes:
+      - etcd_data_02:/etcd
+      - .devcontainer/certs/data/etcd:/etc/ssl/certs/etcd
+    networks:
+        - milvus-standalone
+    healthcheck:
+      test: [ "CMD", "etcdctl", "--endpoints=http://etcd-02:2379", "endpoint", "health" ]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: on-failure
+
   minio:
+    # Minio service
+    # https://min.io/docs/minio/linux/reference/minio-server/minio-server.html
+    # image: minio/minio:RELEASE.2022-03-17T06-34-49Z
     build:
       context: .
       dockerfile: .devcontainer/minio.Dockerfile
       args:
-        MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-        MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+        MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+        MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     container_name: milvus-minio
-#    image: minio/minio:RELEASE.2022-03-17T06-34-49Z
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     volumes:
       - minio_data_std:/minio_data
     networks:
       - milvus-standalone
-#    command: >
-#      minio server --address "minio:9000" --console-address "minio:9001" /minio_data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 5
       start_period: 30s
-  # MySQL service
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: on-failure
+
   mysql:
+    # MySQL DB service
     image: mysql:8.0.28
-    container_name: mysql
+    container_name: milvus-mysql
     shm_size: 2g
     environment:
       MYSQLD_USER: mysql
       # # Disable User Secret
       # MYSQL_ALLOW_EMPTY_PASSWORD: 0
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-milvus_meta}
-      MYSQL_USER: ${MYSQL_USER:-alpha}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-milvus_data}
+      MYSQL_USER: ${MYSQL_USER:-mysql}
       MYSQL_PASSWORD: ${MYSQL_PASSWD:-developer}
       # Secret for root access
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWD:-developer}
@@ -79,16 +215,11 @@ services:
     volumes:
       # # mysql data directory
       - mysql_data_std:/var/lib/mysql
-      - .devcontainer/configs/mysql/entrypoint:/docker-entrypoint-initdb.d:rw
-    restart: on-failure
+      - .devcontainer/config/mysql/entrypoint:/docker-entrypoint-initdb.d:rw
     expose:
       - 3306
       - 33060
       - 33061
-    ports:
-      - "3306:3306"
-      - "33060:33060"
-      - "33061:33061"
     networks:
       - milvus-standalone
     healthcheck:
@@ -97,95 +228,132 @@ services:
       timeout: 20s
       retries: 5
       start_period: 30s
-  # Milvus service
-  standalone:
-    container_name: milvus-standalone
-    image: milvusdb/milvus:v2.2.8
-    command: ["milvus", "run", "standalone"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
     restart: on-failure
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-milvus_meta}
-      MYSQL_USER: ${MYSQL_USER:-alpha}
-      MYSQL_PASSWORD: ${MYSQL_PASSWD:-developer}
+
+  milvus.example.com:
+    # Milvus DB service
+    # image: milvusdb/milvus:v2.2.8
+    build:
+      context: .
+      dockerfile: .devcontainer/milvus.Dockerfile
+      args:
+        VERSION: v2.2.8
+    container_name: milvus.example.com
+    hostname: milvus.example.com
+    env_file:
+      - .devcontainer/config/milvus/milvus.env
+#    command: ["milvus", "run", "standalone"]
     volumes:
-      # container paths to milvus configuration files /milvus/configs/milvus.yaml
-      - .devcontainer/configs/milvus/milvus.yaml:/milvus/configs/milvus.yaml
+      # container paths to milvus configuration files /milvus/config/milvus.yaml
+      - .devcontainer/config/milvus/milvus.yaml:/milvus/config/milvus.yaml
       - milvus_data_std:/milvus
+      - .devcontainer/certs/data/milvus:/etc/ssl/certs/etcd
     networks:
       - milvus-standalone
     ports:
-      - "19530:19530"
-      - "9091:9091"
+      - 19530:19530
+      - 9091:9091
     depends_on:
+      etcd-00:
+        condition: service_started
+      etcd-01:
+        condition: service_started
+      etcd-02:
+        condition: service_started
       mysql:
-        condition: service_healthy
+        condition: service_started
       minio:
-        condition: service_healthy
-      etcd:
-        condition: service_healthy
+        condition: service_started
+      proxy.example.com:
+        condition: service_started
     healthcheck:
-        test: ["CMD", "curl", "-f", "http://127.0.0.1:9091/api/v1/health"]
+        test: ["CMD", "curl", "-f", "http://milvus.example.com:9091/api/v1/health"]
         interval: 30s
         timeout: 30s
         retries: 5
         start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: on-failure
+
   # Milvus GUI service
   milvus-gui:
     image: zilliz/attu:latest
     container_name: milvus-gui
-    restart: on-failure
     environment:
-      MILVUS_URL: http://standalone:19530
+      MILVUS_URL: milvus.example.com:19530
     ports:
-      - "3000:3000"
+      - 3000:3000
     networks:
         - milvus-standalone
     depends_on:
-        standalone:
+        proxy.example.com:
             condition: service_healthy
-
-  # Application service
-  app:
-    build:
-      context: .
-      dockerfile: .devcontainer/app.Dockerfile
-    container_name: app
+        milvus.example.com:
+          condition: service_healthy
+        etcd-00:
+          condition: service_healthy
+        etcd-01:
+          condition: service_healthy
+        etcd-02:
+          condition: service_healthy
+        mysql:
+          condition: service_healthy
+        minio:
+          condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
     restart: on-failure
-    expose:
-      - ${APP_PORT:-8000}
-    ports:
-      - ${APP_PORT:-8000}:${APP_PORT:-8000}
-    environment:
-      APP_NAME: ${APP_NAME:-question_answering}
-      APP_HOST: ${APP_HOST:-0.0.0.0}
-      APP_PORT: ${APP_PORT:-8000}
-      APP_SOURCE: ${APP_SOURCE:-${PWD}}
-      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-debug}
-      MILVUS_USER: ${MILVUS_USER:-milvus}
-      MILVUS_PASSWORD: ${MILVUS_PASSWORD:-developer}
-      MILVUS_HOST: ${MILVUS_HOST:-standalone}
-      MILVUS_PORT: ${MILVUS_PORT:-19530}
-      MILVUS_COLLECTION: ${MILVUS_COLLECTION:-question_answering}
-      MILVUS_CONNECTION_ALIAS: ${MILVUS_CONNECTION_ALIAS:-default}
-      ETCD_HOST: ${ETCD_HOST:-etcd}
-      MYSQL_USER: ${MYSQL_USER:-root}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-developer}
-      MYSQL_HOST: ${MYSQL_HOST:-mysql}
-      MYSQL_PORT: ${MYSQL_PORT:-3306}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-milvus_meta}
-      MYSQL_DATABASE_TABLE_NAME: ${MYSQL_DATABASE_TABLE_NAME:-question_answering}
-    depends_on:
-      standalone:
-        condition: service_healthy
-    working_dir: /app
-    volumes:
-      - ./src:/app
-      - ./src/Resources/models:/root/.cache/torch/
-      - ./.env:/app/.env:ro
-    networks:
-        - milvus-standalone
+
+#  # Application service
+#  app:
+#    build:
+#      context: .
+#      dockerfile: .devcontainer/app.Dockerfile
+#    container_name: app
+#    restart: on-failure
+#    expose:
+#      - ${APP_PORT}
+#    ports:
+#      - ${APP_PORT}:${APP_PORT}
+#    environment:
+#      APP_NAME: ${APP_NAME:-question_answering}
+#      APP_HOST: ${APP_HOST:-0.0.0.0}
+#      APP_PORT: ${APP_PORT:-8000}
+#      APP_SOURCE: ${APP_SOURCE}
+#      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-debug}
+#      MILVUS_USER: ${MILVUS_USER:-milvus}
+#      MILVUS_PASSWORD: ${MILVUS_PASSWORD:-developer}
+#      MILVUS_HOST: ${MILVUS_HOST:-milvus.example.com}
+#      MILVUS_PORT: ${MILVUS_PORT:-19530}
+#      MILVUS_COLLECTION: ${MILVUS_COLLECTION:-question_answering}
+#      MILVUS_CONNECTION_ALIAS: ${MILVUS_CONNECTION_ALIAS:-default}
+#      ETCD_HOST: ${ETCD_HOST:-etcd}
+#      MYSQL_USER: ${MYSQL_USER:-root}
+#      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-developer}
+#      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+#      MYSQL_PORT: ${MYSQL_PORT:-3306}
+#      MYSQL_DATABASE: ${MYSQL_DATABASE:-milvus_meta}
+#      MYSQL_DATABASE_TABLE_NAME: ${MYSQL_DATABASE_TABLE_NAME:-question_answering}
+#    depends_on:
+#      milvus.example.com:
+#        condition: service_healthy
+#    working_dir: /app
+#    volumes:
+#      - ./src:/app
+#      - ./src/Resources/models:/root/.cache/torch/
+#      - ./.env:/app/.env:ro
+#    networks:
+#        - milvus-standalone
 

@@ -1,10 +1,11 @@
+import json
 import traceback
 from dataclasses import dataclass
 from typing import List, Any
 
-from pymysql import connections as mysql_connection
+from pymysql import connections as mysql_connection, Connection
 import pymysql
-from myLogger.Logger import getLogger as GetLogger
+from ..myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 
@@ -31,6 +32,24 @@ class MySQLDatabase(Mysql):
         self.connection = self.connect(host, port, user, password, database, **kwargs)
         self.cursor = self.connection.cursor()
 
+    def __str__(self):
+        return f"{json.dumps(self.__dict__(), indent=4, sort_keys=True, default=lambda o: o.__dict__ if hasattr(o, '__dict__') else str(o))}"
+
+    def __dict__(self):
+        return {
+            'host': f'{self.host}',
+            'port': f'{self.port}',
+            'user': f'{self.user}',
+            'password': f'{self.password}',
+            'database': f'{self.database}',
+            'connection': f'{self.connection}',
+            'cursor': f'{self.cursor}'
+        }
+
+    def close(self):
+        self.connection.close()
+        self.cursor.close()
+
     def connect(self, host, port, user, password, database, **kwargs) -> mysql_connection:
         try:
 
@@ -40,18 +59,25 @@ class MySQLDatabase(Mysql):
             user = user if user else self.user
             password = password if password else self.password
             database = database if database else self.database
-            connection = pymysql.connect(host=host,
-                                         port=port,
-                                         user=user,
-                                         password=password,
-                                         db=database,
-                                         charset=charset,
-                                         )
+            log.debug(f"\nHost: {host}"
+                      f"\nPort: {port}"
+                      f"\nUser: {user}"
+                      f"\nPassword: {password}"
+                      f"\nDatabase: {database}"
+                      f"\nCharset: {charset}")
+            connection: Connection = Connection(host=host,
+                                                                    port=port,
+                                                                    user=user,
+                                                                    password=password,
+                                                                    db=database,
+                                                                    charset=charset,
+                                                                    autocommit=True
+                                                                    )
             return connection
         except Exception as e:
-            log.error(f'Error while connecting to Milvus and MySQL: {e}')
+            log.error(f'Error while connecting to MySQL: {e}')
+            log.error(f"Connection details: \n{self.__str__()}")
             log.error(traceback.format_exc())
-            raise e
 
     def execute_batch_query(self, queries):
         try:
@@ -220,4 +246,3 @@ class MySQLDatabase(Mysql):
             log.error(f'Error while searching by similar questions: \nSql: \n{sql} \n{e} ')
             log.error(traceback.format_exc())
             return []
-

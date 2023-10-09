@@ -8,7 +8,7 @@ from pymilvus import (
 )
 import sys
 import os
-from myLogger.Logger import getLogger as GetLogger
+from ..myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 LOGGER = log.logger

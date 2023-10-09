@@ -28,3 +28,5 @@ src/Resources/datasets/**
 /.github/workflows/
 /src/milvus/flagged/
 /src/milvus/logs/
+/.devcontainer/certs/data/etcd/**
+!/.devcontainer/certs/data/etcd

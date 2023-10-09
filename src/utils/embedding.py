@@ -4,7 +4,7 @@ import pandas as pd
 import re
 
 from pandas import DataFrame
-from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer, CountVectorizer
+# from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer, CountVectorizer
 
 
 # ---------------------------------------------------------------------------------------
@@ -112,71 +112,71 @@ def clean_text(
     return string
 
 
-# ---------------------------------------------------------------------------------------
-class TextEmbedding3DVector:
-    tfidf_fit_vector = None
-    selftfidf_vector = None
-    hashing_fit_vector = None
-    hashing_vector = None
-    count_fit_vector = None
-    count_vector = None
-
-    def __init__(self, input_text: str = None):
-        self.tfidf_vectorizer = TfidfVectorizer()
-        self.hashing_vectorizer = HashingVectorizer()
-        self.count_vectorizer = CountVectorizer()
-        if input_text is not None:
-            self.fit_transforms = self.fit_transform(input_text)
-            self.tfidf_fit_vector, self.hashing_fit_vector, self.count_fit_vector = self.fit_transforms
-            self.transforms = self.transform(input_text)
-            self.tfidf_vector, self.hashing_vector, self.count_vector = self.transforms
-
-    def fit_transform(self, text: str):
-        """
-        Fit and transform the text
-
-        :param text: The text to fit and transform
-        :return: The transformed text (tfidf[Tf-idf-weighted document-term matrix],
-        hashing[Document-term matrix],
-        count[Document-term matrix])
-        """
-        tfidf_vector = self.get_tfidf_fit_vector(text)
-        hashing_vector = self.get_hashing_fit_vector(text)
-        count_vector = self.get_count_fit_vector(text)
-        return tfidf_vector, hashing_vector, count_vector
-
-    def transform(self, text: str):
-        """
-        Fit and transform the text
-
-        :param text: The text to fit and transform
-        :return: The transformed text (tfidf[Tf-idf-weighted document-term matrix],
-        hashing[Document-term matrix],
-        count[Document-term matrix])
-        """
-        tfidf_vector = self.get_tfidf_vector(text)
-        hashing_vector = self.get_hashing_vector(text)
-        count_vector = self.get_count_vector(text)
-        return tfidf_vector, hashing_vector, count_vector
-
-    def get_hashing_vector(self, text: str):
-        return self.hashing_vectorizer.transform(chunk_the_text(clean_text(text)))
-
-    def get_tfidf_vector(self, text: str):
-        return self.tfidf_vectorizer.transform(chunk_the_text(clean_text(text)))
-
-    def get_count_vector(self, text: str):
-        return self.count_vectorizer.transform(chunk_the_text(clean_text(text)))
-
-    def get_tfidf_fit_vector(self, text: str):
-        return self.tfidf_vectorizer.fit_transform(chunk_the_text(clean_text(text)))
-
-    def get_count_fit_vector(self, text: str):
-        return self.count_vectorizer.fit_transform(chunk_the_text(clean_text(text)))
-
-    def get_hashing_fit_vector(self, text: str):
-        return self.hashing_vectorizer.fit_transform(chunk_the_text(clean_text(text)))
-
-    def language_translation(self, text, target_language):
-        # TODO: Add language translation logic
-        pass
+# # ---------------------------------------------------------------------------------------
+# class TextEmbedding3DVector:
+#     tfidf_fit_vector = None
+#     selftfidf_vector = None
+#     hashing_fit_vector = None
+#     hashing_vector = None
+#     count_fit_vector = None
+#     count_vector = None
+#
+#     def __init__(self, input_text: str = None):
+#         self.tfidf_vectorizer = TfidfVectorizer()
+#         self.hashing_vectorizer = HashingVectorizer()
+#         self.count_vectorizer = CountVectorizer()
+#         if input_text is not None:
+#             self.fit_transforms = self.fit_transform(input_text)
+#             self.tfidf_fit_vector, self.hashing_fit_vector, self.count_fit_vector = self.fit_transforms
+#             self.transforms = self.transform(input_text)
+#             self.tfidf_vector, self.hashing_vector, self.count_vector = self.transforms
+#
+#     def fit_transform(self, text: str):
+#         """
+#         Fit and transform the text
+#
+#         :param text: The text to fit and transform
+#         :return: The transformed text (tfidf[Tf-idf-weighted document-term matrix],
+#         hashing[Document-term matrix],
+#         count[Document-term matrix])
+#         """
+#         tfidf_vector = self.get_tfidf_fit_vector(text)
+#         hashing_vector = self.get_hashing_fit_vector(text)
+#         count_vector = self.get_count_fit_vector(text)
+#         return tfidf_vector, hashing_vector, count_vector
+#
+#     def transform(self, text: str):
+#         """
+#         Fit and transform the text
+#
+#         :param text: The text to fit and transform
+#         :return: The transformed text (tfidf[Tf-idf-weighted document-term matrix],
+#         hashing[Document-term matrix],
+#         count[Document-term matrix])
+#         """
+#         tfidf_vector = self.get_tfidf_vector(text)
+#         hashing_vector = self.get_hashing_vector(text)
+#         count_vector = self.get_count_vector(text)
+#         return tfidf_vector, hashing_vector, count_vector
+#
+#     def get_hashing_vector(self, text: str):
+#         return self.hashing_vectorizer.transform(chunk_the_text(clean_text(text)))
+#
+#     def get_tfidf_vector(self, text: str):
+#         return self.tfidf_vectorizer.transform(chunk_the_text(clean_text(text)))
+#
+#     def get_count_vector(self, text: str):
+#         return self.count_vectorizer.transform(chunk_the_text(clean_text(text)))
+#
+#     def get_tfidf_fit_vector(self, text: str):
+#         return self.tfidf_vectorizer.fit_transform(chunk_the_text(clean_text(text)))
+#
+#     def get_count_fit_vector(self, text: str):
+#         return self.count_vectorizer.fit_transform(chunk_the_text(clean_text(text)))
+#
+#     def get_hashing_fit_vector(self, text: str):
+#         return self.hashing_vectorizer.fit_transform(chunk_the_text(clean_text(text)))
+#
+#     def language_translation(self, text, target_language):
+#         # TODO: Add language translation logic
+#         pass

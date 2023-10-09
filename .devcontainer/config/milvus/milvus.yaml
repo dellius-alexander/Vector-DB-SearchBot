@@ -16,9 +16,11 @@
 
 # Related configuration of etcd, used to store Milvus metadata & service discovery.
 etcd:
-  endpoints:
-    - etcd:2379
-  rootPath: by-dev # The root path where data is stored in etcd
+  endpoints: # The URLs needed to be a comma-separated list.
+  - proxy.example.com:2379  # Use the etcd container name
+  # To share an etcd instance among multiple Milvus instances, you need
+  # to change etcd.rootPath to a unique value for each of the Milvus instances.
+  rootPath: /etcd # The root path where data is stored in etcd
   metaSubPath: meta # metaRootPath = rootPath + '/' + metaSubPath
   kvSubPath: kv # kvRootPath = rootPath + '/' + kvSubPath
   log:
@@ -29,19 +31,19 @@ etcd:
     #  - file path to append server logs to.
     # please adjust in embedded Milvus: /tmp/milvus/logs/etcd.log
     path: stdout
-    level: info # Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
+    level: debug # Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
   use:
     # please adjust in embedded Milvus: true
     embed: false # Whether to enable embedded Etcd (an in-process EtcdServer).
   data:
     # Embedded Etcd only.
     # please adjust in embedded Milvus: /tmp/milvus/etcdData/
-    dir: default.etcd
+    dir: /etcd
   ssl:
     enabled: false # Whether to support ETCD secure connection mode
-    tlsCert: /path/to/etcd-client.pem # path to your cert file
-    tlsKey: /path/to/etcd-client-key.pem # path to your key file
-    tlsCACert: /path/to/ca.pem # path to your CACert file
+    tlsCert: /etc/ssl/certs/etcd/milvus-etcd.crt # path to your cert file
+    tlsKey: /etc/ssl/certs/etcd/milvus-etcd.key # path to your key file
+    tlsCACert: /etc/ssl/certs/etcd/milvus-etcd.pem # path to your CACert file
     # TLS min version
     # Optional values: 1.0, 1.1, 1.2, 1.3。
     # We recommend using version 1.2 and above
@@ -56,12 +58,13 @@ metastore:
 mysql:
   username: milvus
   password: developer
-  address: mysql
+  address: proxy.example.com
   port: 3306
   dbName: milvus_meta
   driverName: mysql
   maxOpenConns: 20
   maxIdleConns: 5
+
 
 # please adjust in embedded Milvus: /tmp/milvus/data/
 localStorage:
@@ -70,7 +73,7 @@ localStorage:
 # Related configuration of MinIO/S3/GCS or any other service supports S3 API, which is responsible for data persistence for Milvus.
 # We refer to the storage service as MinIO/S3 in the following description for simplicity.
 minio:
-  address: minio # Address of MinIO/S3
+  address: proxy.example.com # Address of MinIO/S3
   port: 9000   # Port of MinIO/S3
   accessKeyID: minioadmin # accessKeyID of MinIO/S3
   secretAccessKey: minioadmin # MinIO/S3 encryption string
@@ -98,20 +101,20 @@ minio:
 
 # Related configuration of pulsar, used to manage Milvus logs of recent mutation operations, output streaming log, and provide log publish-subscribe services.
 pulsar:
-  address: pulsar # Address of pulsar
+  address: milvus.example.com # Address of pulsar
   port: 6650 # Port of pulsar
   webport: 80 # Web port of pulsar, if you connect direcly without proxy, should use 8080
   maxMessageSize: 5242880 # 5 * 1024 * 1024 Bytes, Maximum size of each message in pulsar.
   tenant: public
   namespace: default
 
-# If you want to enable kafka, needs to comment the pulsar configs
+# If you want to enable kafka, needs to comment the pulsar config
 kafka:
   producer:
     client.id: dc
   consumer:
     client.id: dc1
-#  brokerList: localhost1:9092,localhost2:9092,localhost3:9092
+#  brokerList: milvus1.example.com:9092,milvus2.example.com:9092,milvus3.example.com:9092
 #  saslUsername: username
 #  saslPassword: password
 #  saslMechanisms: PLAIN
@@ -128,7 +131,7 @@ rocksmq:
 
 # Related configuration of rootCoord, used to handle data definition language (DDL) and data control language (DCL) requests
 rootCoord:
-  address: rootcoord
+  address: milvus.example.com
   port: 53100
   enableActiveStandby: false  # Enable active-standby
 
@@ -150,7 +153,7 @@ proxy:
   internalPort: 19529
   http:
     enabled: true # Whether to enable the http server
-    debug_mode: false # Whether to enable http server debug mode
+    debug_mode: true # Whether to enable http server debug mode
 
   timeTickInterval: 200 # ms, the interval that proxy synchronize the time tick
   msgStream:
@@ -176,7 +179,7 @@ proxy:
 
 # Related configuration of queryCoord, used to manage topology and load balancing for the query nodes, and handoff from growing segments to sealed segments.
 queryCoord:
-  address: querycoord
+  address: milvus.example.com
   port: 19531
   autoHandoff: true # Enable auto handoff
   autoBalance: true # Enable auto balance
@@ -246,7 +249,7 @@ queryNode:
     topKMergeRatio: 10.0
 
 indexCoord:
-  address: indexcoord
+  address: milvus.example.com
   port: 31000
   enableActiveStandby: false  # Enable active-standby
 
@@ -254,7 +257,7 @@ indexCoord:
 
   bindIndexNodeMode:
     enable: false
-    address: "localhost:22930"
+    address: 127.0.0.1:22930
     withCred: false
     nodeID: 0
 
@@ -274,7 +277,7 @@ indexNode:
     buildParallel: 1
 
 dataCoord:
-  address: datacoord
+  address: milvus.example.com
   port: 13333
   enableCompaction: true # Enable data segment compaction
   enableGarbageCollection: true
@@ -319,6 +322,7 @@ dataCoord:
 
 dataNode:
   port: 21124
+
   dataSync:
     flowGraph:
       maxQueueLength: 1024 # Maximum length of task queue in flowgraph
@@ -371,9 +375,9 @@ grpc:
 
 # Configure the proxy tls enable.
 tls:
-  serverPemPath: configs/cert/server.pem
-  serverKeyPath: configs/cert/server.key
-  caPemPath: configs/cert/ca.pem
+  serverPemPath: config/cert/server.pem
+  serverKeyPath: config/cert/server.key
+  caPemPath: config/cert/ca.pem
 
 
 common:
@@ -433,11 +437,16 @@ common:
     authorizationEnabled: false
     # The superusers will ignore some system check processes,
     # like the old password verification when updating the credential
-    # superUsers:
-    #  - "root"
+    superUsers:
+      - "root"
+      - "milvus"
+      - "admin"
+      - "alpha"
+      - "beta"
     # tls mode values [0, 1, 2]
     # 0 is close, 1 is one-way authentication, 2 is two-way authentication.
     tlsMode: 0
+
 
   session:
     ttl: 20 # ttl value when session granting a lease to register service
@@ -546,4 +555,4 @@ quotaAndLimits:
       # until the read result rate no longer exceeds maxReadResultRate.
       maxReadResultRate: -1 # MB/s, default no limit
     # coolOffSpeed is the speed of search&query rates cool off.
-    coolOffSpeed: 0.9 # (0, 1]
+    coolOffSpeed: 0.9 # [0, 1]

@@ -1,7 +1,7 @@
 import bcrypt
 
 # Get the logger
-from myLogger.Logger import getLogger as GetLogger
+from ..myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 

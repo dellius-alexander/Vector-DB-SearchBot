@@ -10,9 +10,9 @@ import json
 import time
 
 import numpy as np
-from database.milvus import ConnectAPI, CollectionAPI
+from ..database.milvus import ConnectAPI, CollectionAPI
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
-from myLogger.Logger import getLogger as GetLogger
+from ..myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 

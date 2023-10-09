@@ -17,7 +17,9 @@
 # Related configuration of etcd, used to store Milvus metadata & service discovery.
 etcd:
   endpoints:
-    - etcd:2379
+    - proxy.example.com:2379
+  # To share an etcd instance among multiple Milvus instances, you need
+  # to change etcd.rootPath to a unique value for each of the Milvus instances.
   rootPath: by-dev # The root path where data is stored in etcd
   metaSubPath: meta # metaRootPath = rootPath + '/' + metaSubPath
   kvSubPath: kv # kvRootPath = rootPath + '/' + kvSubPath
@@ -29,19 +31,19 @@ etcd:
     #  - file path to append server logs to.
     # please adjust in embedded Milvus: /tmp/milvus/logs/etcd.log
     path: stdout
-    level: info # Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
+    level: debug # Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
   use:
     # please adjust in embedded Milvus: true
     embed: false # Whether to enable embedded Etcd (an in-process EtcdServer).
   data:
     # Embedded Etcd only.
     # please adjust in embedded Milvus: /tmp/milvus/etcdData/
-    dir: default.etcd
+    dir: /etcd
   ssl:
     enabled: false # Whether to support ETCD secure connection mode
-    tlsCert: /path/to/etcd-client.pem # path to your cert file
-    tlsKey: /path/to/etcd-client-key.pem # path to your key file
-    tlsCACert: /path/to/ca.pem # path to your CACert file
+    tlsCert: /etc/ssl/certs/etcd/milvus-proxy.crt # path to your cert file
+    tlsKey: /etc/ssl/certs/etcd/milvus-proxy.key # path to your key file
+    tlsCACert: /etc/ssl/certs/etcd/milvus-proxy.pem # path to your CACert file
     # TLS min version
     # Optional values: 1.0, 1.1, 1.2, 1.3。
     # We recommend using version 1.2 and above
@@ -56,13 +58,12 @@ metastore:
 mysql:
   username: milvus
   password: developer
-  address: mysql
+  address: proxy.example.com
   port: 3306
   dbName: milvus_meta
   driverName: mysql
   maxOpenConns: 20
   maxIdleConns: 5
-
 
 # please adjust in embedded Milvus: /tmp/milvus/data/
 localStorage:
@@ -71,7 +72,7 @@ localStorage:
 # Related configuration of MinIO/S3/GCS or any other service supports S3 API, which is responsible for data persistence for Milvus.
 # We refer to the storage service as MinIO/S3 in the following description for simplicity.
 minio:
-  address: minio # Address of MinIO/S3
+  address: proxy.example.com # Address of MinIO/S3
   port: 9000   # Port of MinIO/S3
   accessKeyID: minioadmin # accessKeyID of MinIO/S3
   secretAccessKey: minioadmin # MinIO/S3 encryption string
@@ -99,14 +100,14 @@ minio:
 
 # Related configuration of pulsar, used to manage Milvus logs of recent mutation operations, output streaming log, and provide log publish-subscribe services.
 pulsar:
-  address: localhost # Address of pulsar
+  address: proxy.example.com # Address of pulsar
   port: 6650 # Port of pulsar
-  webport: 80 # Web port of pulsar, if you connect direcly without proxy, should use 8080
+  webport: 8081 # Web port of pulsar, if you connect direcly without proxy, should use 8080
   maxMessageSize: 5242880 # 5 * 1024 * 1024 Bytes, Maximum size of each message in pulsar.
   tenant: public
   namespace: default
 
-# If you want to enable kafka, needs to comment the pulsar configs
+# If you want to enable kafka, needs to comment the pulsar config
 kafka:
   producer:
     client.id: dc
@@ -129,7 +130,7 @@ rocksmq:
 
 # Related configuration of rootCoord, used to handle data definition language (DDL) and data control language (DCL) requests
 rootCoord:
-  address: localhost
+  address: proxy.example.com  # rootcoord.example.com  # rootcoord
   port: 53100
   enableActiveStandby: false  # Enable active-standby
 
@@ -147,11 +148,12 @@ rootCoord:
 
 # Related configuration of proxy, used to validate client requests and reduce the returned results.
 proxy:
+  address: proxy.example.com  # milvus.example.com # milvus-proxy
   port: 19530
   internalPort: 19529
   http:
     enabled: true # Whether to enable the http server
-    debug_mode: true # Whether to enable http server debug mode
+    debug_mode: false # Whether to enable http server debug mode
 
   timeTickInterval: 200 # ms, the interval that proxy synchronize the time tick
   msgStream:
@@ -177,7 +179,7 @@ proxy:
 
 # Related configuration of queryCoord, used to manage topology and load balancing for the query nodes, and handoff from growing segments to sealed segments.
 queryCoord:
-  address: localhost
+  address: proxy.example.com  # querycoord.example.com # querycoord
   port: 19531
   autoHandoff: true # Enable auto handoff
   autoBalance: true # Enable auto balance
@@ -201,6 +203,7 @@ queryCoord:
 
 # Related configuration of queryNode, used to run hybrid search between vector and scalar data.
 queryNode:
+  address: proxy.example.com  # querynode.example.com # querynode
   cacheSize: 32 # GB, default 32 GB, `cacheSize` is the memory used for caching data for faster query. The `cacheSize` must be less than system memory size.
   port: 21123
   loadMemoryUsageFactor: 3 # The multiply factor of calculating the memory usage while loading segments
@@ -247,7 +250,7 @@ queryNode:
     topKMergeRatio: 10.0
 
 indexCoord:
-  address: localhost
+  address: proxy.example.com  # indexcoord.example.com # indexcoord
   port: 31000
   enableActiveStandby: false  # Enable active-standby
 
@@ -266,6 +269,7 @@ indexCoord:
     interval: 1000 # scheduler interval in Millisecond
 
 indexNode:
+  address: proxy.example.com  # indexnode.example.com # indexnode
   port: 21121
   enableDisk: true # enable index node build disk vector index
   maxDiskUsagePercentage: 95
@@ -275,7 +279,7 @@ indexNode:
     buildParallel: 1
 
 dataCoord:
-  address: localhost
+  address: proxy.example.com  # datacoord.example.com # datacoord
   port: 13333
   enableCompaction: true # Enable data segment compaction
   enableGarbageCollection: true
@@ -319,8 +323,8 @@ dataCoord:
 
 
 dataNode:
+  address: proxy.example.com   # datanode.example.com # datanode
   port: 21124
-
   dataSync:
     flowGraph:
       maxQueueLength: 1024 # Maximum length of task queue in flowgraph
@@ -373,9 +377,9 @@ grpc:
 
 # Configure the proxy tls enable.
 tls:
-  serverPemPath: configs/cert/server.pem
-  serverKeyPath: configs/cert/server.key
-  caPemPath: configs/cert/ca.pem
+  serverPemPath: config/cert/server.pem
+  serverKeyPath: config/cert/server.key
+  caPemPath: config/cert/ca.pem
 
 
 common:

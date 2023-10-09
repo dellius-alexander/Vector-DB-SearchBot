@@ -1,6 +1,6 @@
-from pymongo import monitoring
-from myLogger.Logger import getLogger as GetLogger
-from database.db import connect_to_mongo
+# from pymongo import monitoring
+from ..myLogger.Logger import getLogger as GetLogger
+from ..database.mongo import connect_to_mongo
 
 log = GetLogger(__name__)
 
@@ -33,6 +33,6 @@ class CommandLogger(monitoring.CommandListener):
 
 
 # -----------------------------------------------------------------------------
-monitoring.register(CommandLogger())
+# monitoring.register(CommandLogger())
 connect_to_mongo()
 # -----------------------------------------------------------------------------

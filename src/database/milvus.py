@@ -9,8 +9,9 @@ from typing import List, Dict, Any, Union
 import jsonlines
 import numpy as np
 from pymilvus import FieldSchema, CollectionSchema, DataType, Collection, utility
-import mysql.connector as mysql_connector
-from myLogger.Logger import getLogger as GetLogger
+
+import pymysql as mysql
+from ..myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 
@@ -410,7 +411,7 @@ class DatabaseManager:
 
     def connect(self):
         try:
-            self.connection = mysql_connector.connect(
+            self.connection = mysql.connect(
                 host=self.config['host'],
                 database=self.config['database'],
                 user=self.config['user'],

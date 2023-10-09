@@ -1,10 +1,10 @@
 import traceback
 from pymilvus import Collection, FieldSchema, DataType
 import gradio as gr
-from database.mysql import MySQLDatabase
-from milvus.milvus_helper import MilvusClient
-from milvus.question_answering import load_data_to_mysql, generate_and_store_embeddings, format_data, handle_diff
-from myLogger.Logger import getLogger as GetLogger
+from ..database.mysql import MySQLDatabase
+from ..milvus.milvus_helper import MilvusClient
+from ..milvus.question_answering import load_data_to_mysql, generate_and_store_embeddings, format_data, handle_diff
+from ..myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 

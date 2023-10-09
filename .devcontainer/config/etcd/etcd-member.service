@@ -1,0 +1,12 @@
+# Container Linux's etcd-member.service systemd unit knows how to
+# fetch and run the current etcd v3.x container image, providing etcd v3
+# without requiring the binary to be present in every default OS installation.
+etcd:
+  name:                        etcd-1
+  listen_client_urls:          https://127.0.0.1:2379
+  advertise_client_urls:       https://127.0.0.1:2379
+  listen_peer_urls:            https://127.0.0.1:2380
+  initial_advertise_peer_urls: https://127.0.0.1:2380
+  initial_cluster:             etcd-1=https://127.0.0.1:2380
+  initial_cluster_token:       etcd-cluster-1
+  initial_cluster_state:       new

@@ -17,7 +17,7 @@ RUN apt-get update -y && \
     cmake
 
 # Copy requirements.txt to the image
-COPY requirements.txt* /tmp/requirements.txt
+COPY ${PWD}/requirements.txt* /tmp/requirements.txt
 
 # Update pip and Install dependencies
 RUN python -m pip install --no-cache-dir --upgrade -r /tmp/requirements.txt pip
@@ -28,7 +28,7 @@ RUN mkdir -p \
     /entrypoint \
     /healthcheck
 
-COPY .devcontainer/entrypoint/entrypoint.sh* /entrypoint/entrypoint.sh
+COPY .devcontainer/config/app/entrypoint.sh* /entrypoint/entrypoint.sh
 COPY .devcontainer/healthcheck/healthcheck.js /healthcheck/healthcheck.js
 HEALTHCHECK --interval=15s --timeout=15s --start-period=30s \
  CMD node /healthcheck/healthcheck.js

@@ -4,8 +4,8 @@ from typing import List, Dict, Any
 from pandas import DataFrame
 from pymilvus import connections as milvus_connection, CollectionSchema, FieldSchema, Collection
 
-from database.milvus import MilvusAPI
-from myLogger.Logger import getLogger as GetLogger
+from src.database.milvus import MilvusAPI
+from src.myLogger.Logger import getLogger as GetLogger
 
 log = GetLogger(__name__)
 

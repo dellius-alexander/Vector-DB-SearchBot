@@ -27,5 +27,6 @@ RUN curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /tmp/mc && 
 #RUN mc admin heal local
 #RUN mc admin update ${MINIO_ROOT_USER}
 #RUN mc admin user add local ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}
-
+RUN mkdir -p /minio_data
+EXPOSE 9000 9001
 CMD ["minio", "server", "--address", "minio:9000", "--console-address", "minio:9001", "/minio_data"]
